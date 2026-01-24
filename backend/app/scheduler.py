@@ -47,6 +47,15 @@ def start_scheduler():
         logger.info("[Scheduler] Skipped in testing environment")
         return
 
+    # 서버 시작 시 즉시 1회 실행
+    scheduler.add_job(
+        scheduled_fetch,
+        id="rss_fetch_initial",
+        name="RSS Feed Fetch (Initial)",
+        replace_existing=True,
+    )
+
+    # 이후 3시간마다 실행
     scheduler.add_job(
         scheduled_fetch,
         trigger=IntervalTrigger(hours=FETCH_INTERVAL_HOURS),
@@ -57,7 +66,7 @@ def start_scheduler():
 
     scheduler.start()
     logger.info(
-        f"[Scheduler] Started - RSS fetch every {FETCH_INTERVAL_HOURS} hours"
+        f"[Scheduler] Started - Initial fetch + every {FETCH_INTERVAL_HOURS} hours"
     )
 
 
