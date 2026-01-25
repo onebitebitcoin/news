@@ -2,6 +2,8 @@
 
 import logging
 import os
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -20,10 +22,35 @@ scheduler = AsyncIOScheduler()
 # 수집 주기 (시간)
 FETCH_INTERVAL_HOURS = 3
 
+# 스케줄러 상태 저장 (메모리)
+last_fetch_at: Optional[datetime] = None
+next_fetch_at: Optional[datetime] = None
+
+
+def get_scheduler_status() -> dict:
+    """스케줄러 상태 조회"""
+    return {
+        "last_fetch_at": last_fetch_at.isoformat() if last_fetch_at else None,
+        "next_fetch_at": next_fetch_at.isoformat() if next_fetch_at else None,
+        "interval_hours": FETCH_INTERVAL_HOURS,
+        "is_running": scheduler.running,
+    }
+
+
+def _update_scheduler_status():
+    """스케줄러 상태 업데이트"""
+    global last_fetch_at, next_fetch_at
+    last_fetch_at = datetime.now(timezone.utc)
+    next_fetch_at = last_fetch_at + timedelta(hours=FETCH_INTERVAL_HOURS)
+    logger.info(f"[Scheduler] Status updated - Last: {last_fetch_at}, Next: {next_fetch_at}")
+
 
 async def scheduled_fetch():
     """스케줄된 RSS 수집 작업"""
     logger.info("[Scheduler] Starting scheduled RSS fetch...")
+
+    # 상태 업데이트 (실행 시점 기록)
+    _update_scheduler_status()
 
     db = SessionLocal()
     try:

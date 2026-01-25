@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.source_status import SourceStatus
+from app.scheduler import get_scheduler_status
 from app.services.fetch_engine import FetchEngine
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,14 @@ class SourcesListResponse(BaseModel):
     """소스 목록 응답"""
     sources: List[SourceStatusResponse]
     available_sources: List[str]
+
+
+class SchedulerStatusResponse(BaseModel):
+    """스케줄러 상태 응답"""
+    last_fetch_at: Optional[str] = None
+    next_fetch_at: Optional[str] = None
+    interval_hours: int
+    is_running: bool
 
 
 # === API Endpoints ===
@@ -174,3 +183,13 @@ async def get_sources(db: Session = Depends(get_db)):
         sources=sources,
         available_sources=available_sources,
     )
+
+
+@router.get("/scheduler-status", response_model=SchedulerStatusResponse)
+async def get_scheduler_status_endpoint():
+    """
+    스케줄러 상태 조회
+
+    마지막 RSS 수집 시간과 다음 예정 시간을 반환합니다.
+    """
+    return get_scheduler_status()

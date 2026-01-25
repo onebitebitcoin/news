@@ -31,6 +31,12 @@ export const feedApi = {
     const { data } = await client.get('/feed/categories')
     return data
   },
+
+  // 스케줄러 상태 조회
+  getSchedulerStatus: async () => {
+    const { data } = await client.get('/admin/scheduler-status')
+    return data
+  },
 }
 
 export const bookmarkApi = {

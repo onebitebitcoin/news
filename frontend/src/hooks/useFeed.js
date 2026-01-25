@@ -154,3 +154,28 @@ export function useBookmarks() {
 
   return { items, loading, error, refresh: fetchBookmarks, removeBookmark }
 }
+
+export function useSchedulerStatus() {
+  const [status, setStatus] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const data = await feedApi.getSchedulerStatus()
+      setStatus(data)
+    } catch (err) {
+      console.error('Failed to fetch scheduler status:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchStatus()
+    // 1분마다 상태 업데이트
+    const interval = setInterval(fetchStatus, 60000)
+    return () => clearInterval(interval)
+  }, [fetchStatus])
+
+  return { status, loading, refresh: fetchStatus }
+}
