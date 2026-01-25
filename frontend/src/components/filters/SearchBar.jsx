@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { Search, X } from 'lucide-react'
 
-export default function SearchBar({ value, onChange, placeholder = 'Search news...' }) {
+export default function SearchBar({ value, onChange, placeholder = '뉴스 검색...' }) {
   const [localValue, setLocalValue] = useState(value || '')
 
   const handleSubmit = useCallback((e) => {

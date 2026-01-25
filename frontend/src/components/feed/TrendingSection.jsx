@@ -10,7 +10,7 @@ export default function TrendingSection() {
       <div className="py-4">
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp className="w-4 h-4 text-orange-500" />
-          <span className="font-semibold text-sm">Trending</span>
+          <span className="font-semibold text-sm">인기</span>
         </div>
         <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-2">
           {[...Array(3)].map((_, i) => (
@@ -30,7 +30,7 @@ export default function TrendingSection() {
     <div className="py-4">
       <div className="flex items-center gap-2 mb-3">
         <TrendingUp className="w-4 h-4 text-orange-500" />
-        <span className="font-semibold text-sm">Trending</span>
+        <span className="font-semibold text-sm">인기</span>
       </div>
       <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-2 -mx-2 px-2">
         {items.map((item, index) => (

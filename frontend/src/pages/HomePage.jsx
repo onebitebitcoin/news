@@ -85,7 +85,7 @@ export default function HomePage() {
       {/* Header */}
       <div className="flex items-center justify-between py-3">
         <div className="flex items-center gap-3">
-          <h2 className="font-bold text-lg">Latest News</h2>
+          <h2 className="font-bold text-lg">최신 뉴스</h2>
           {isFetching ? (
             <span className="text-sm text-amber-500 flex items-center gap-2">
               <span className="inline-block w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
