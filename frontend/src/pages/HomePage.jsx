@@ -4,7 +4,7 @@ import TrendingSection from '../components/feed/TrendingSection'
 import CategoryChips from '../components/filters/CategoryChips'
 import SearchBar from '../components/filters/SearchBar'
 import FeedList from '../components/feed/FeedList'
-import { useFeed, useCategories, useSchedulerStatus } from '../hooks/useFeed'
+import { useFeed, useCategories, useSchedulerStatus, useFetchProgress } from '../hooks/useFeed'
 
 // 상대 시간 표시 함수
 function getRelativeTime(dateString) {
@@ -39,6 +39,7 @@ export default function HomePage() {
   } = useFeed({ category, search })
 
   const { status: schedulerStatus, refresh: refreshScheduler } = useSchedulerStatus()
+  const { progress: fetchProgress, refresh: refreshProgress } = useFetchProgress()
 
   // 마지막 수집 시간 (상대 시간)
   const lastFetchText = useMemo(() => {
@@ -46,11 +47,15 @@ export default function HomePage() {
     return getRelativeTime(schedulerStatus.last_fetch_at)
   }, [schedulerStatus?.last_fetch_at])
 
-  // 새로고침 핸들러 (피드 + 스케줄러 상태 모두 갱신)
+  // 수집 중 여부
+  const isFetching = fetchProgress?.status === 'running'
+
+  // 새로고침 핸들러 (피드 + 스케줄러 상태 + 진행 상황 모두 갱신)
   const handleRefresh = useCallback(() => {
     refresh()
     refreshScheduler()
-  }, [refresh, refreshScheduler])
+    refreshProgress()
+  }, [refresh, refreshScheduler, refreshProgress])
 
   const handleCategoryChange = useCallback((newCategory) => {
     setCategory(newCategory)
@@ -81,11 +86,21 @@ export default function HomePage() {
       <div className="flex items-center justify-between py-3">
         <div className="flex items-center gap-3">
           <h2 className="font-bold text-lg">Latest News</h2>
-          {lastFetchText && (
+          {isFetching ? (
+            <span className="text-sm text-amber-500 flex items-center gap-2">
+              <span className="inline-block w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+              수집 중... ({fetchProgress.current_source || '시작'} {fetchProgress.sources_completed}/{fetchProgress.sources_total})
+              {fetchProgress.items_fetched > 0 && (
+                <span className="text-zinc-500">
+                  - {fetchProgress.items_fetched}개 조회, {fetchProgress.items_saved}개 저장
+                </span>
+              )}
+            </span>
+          ) : lastFetchText ? (
             <span className="text-sm text-zinc-500">
               마지막 수집: {lastFetchText}
             </span>
-          )}
+          ) : null}
         </div>
         <button
           onClick={handleRefresh}

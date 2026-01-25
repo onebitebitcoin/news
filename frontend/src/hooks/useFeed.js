@@ -179,3 +179,30 @@ export function useSchedulerStatus() {
 
   return { status, loading, refresh: fetchStatus }
 }
+
+export function useFetchProgress() {
+  const [progress, setProgress] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  const fetchProgress = useCallback(async () => {
+    try {
+      const data = await feedApi.getFetchProgress()
+      setProgress(data)
+    } catch (err) {
+      console.error('Failed to fetch progress:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchProgress()
+    // 수집 중일 때 2초 간격, 아닐 때 30초 간격으로 폴링
+    const interval = setInterval(() => {
+      fetchProgress()
+    }, progress?.status === 'running' ? 2000 : 30000)
+    return () => clearInterval(interval)
+  }, [fetchProgress, progress?.status])
+
+  return { progress, loading, refresh: fetchProgress }
+}

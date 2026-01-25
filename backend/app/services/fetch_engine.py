@@ -3,7 +3,7 @@
 import json
 import logging
 from datetime import datetime
-from typing import Dict, List, Type
+from typing import Callable, Dict, List, Optional, Type
 
 from sqlalchemy.orm import Session
 
@@ -57,8 +57,14 @@ class FetchEngine:
         self.translate = translate
         self.translator = TranslateService() if translate else None
 
-    async def run_all(self) -> Dict:
+    async def run_all(
+        self,
+        progress_callback: Optional[Callable[[Dict], None]] = None
+    ) -> Dict:
         """모든 소스에서 RSS 수집 실행
+
+        Args:
+            progress_callback: 진행 상황 콜백 함수 (optional)
 
         Returns:
             수집 결과 통계
@@ -76,9 +82,26 @@ class FetchEngine:
             "finished_at": None,
         }
 
-        for FetcherClass in self.FETCHERS:
+        sources_total = len(self.FETCHERS)
+
+        # 시작 시 콜백
+        if progress_callback:
+            await progress_callback({
+                "sources_total": sources_total,
+            })
+
+        for i, FetcherClass in enumerate(self.FETCHERS):
+            source_name = FetcherClass.source_name
+
+            # 소스 처리 시작 시 콜백
+            if progress_callback:
+                await progress_callback({
+                    "current_source": source_name,
+                    "sources_completed": i,
+                })
+
             source_result = await self._run_source(FetcherClass)
-            results["sources"][FetcherClass.source_name] = source_result
+            results["sources"][source_name] = source_result
 
             results["total_fetched"] += source_result["fetched"]
             results["total_saved"] += source_result["saved"]
@@ -87,6 +110,15 @@ class FetchEngine:
 
             if not source_result["success"]:
                 results["success"] = False
+
+            # 소스 완료 후 콜백
+            if progress_callback:
+                await progress_callback({
+                    "sources_completed": i + 1,
+                    "items_fetched": results["total_fetched"],
+                    "items_saved": results["total_saved"],
+                    "items_duplicates": results["total_duplicates"],
+                })
 
         results["finished_at"] = datetime.utcnow().isoformat()
 

@@ -37,6 +37,12 @@ export const feedApi = {
     const { data } = await client.get('/admin/scheduler-status')
     return data
   },
+
+  // 수집 진행 상황 조회
+  getFetchProgress: async () => {
+    const { data } = await client.get('/admin/fetch-progress')
+    return data
+  },
 }
 
 export const bookmarkApi = {

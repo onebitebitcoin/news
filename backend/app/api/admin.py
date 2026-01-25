@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.source_status import SourceStatus
-from app.scheduler import get_scheduler_status
+from app.scheduler import get_fetch_progress, get_scheduler_status
 from app.services.fetch_engine import FetchEngine
 
 logger = logging.getLogger(__name__)
@@ -62,6 +62,18 @@ class SchedulerStatusResponse(BaseModel):
     next_fetch_at: Optional[str] = None
     interval_hours: int
     is_running: bool
+
+
+class FetchProgressResponse(BaseModel):
+    """수집 진행 상황 응답"""
+    status: str  # idle, running, completed
+    started_at: Optional[str] = None
+    current_source: Optional[str] = None
+    sources_completed: int = 0
+    sources_total: int = 0
+    items_fetched: int = 0
+    items_saved: int = 0
+    items_duplicates: int = 0
 
 
 # === API Endpoints ===
@@ -193,3 +205,17 @@ async def get_scheduler_status_endpoint():
     마지막 RSS 수집 시간과 다음 예정 시간을 반환합니다.
     """
     return get_scheduler_status()
+
+
+@router.get("/fetch-progress", response_model=FetchProgressResponse)
+async def get_fetch_progress_endpoint():
+    """
+    수집 진행 상황 조회
+
+    현재 RSS 수집이 진행 중인 경우 진행 상황을 반환합니다.
+    - status: idle(대기), running(진행 중), completed(완료)
+    - current_source: 현재 처리 중인 소스
+    - sources_completed/total: 완료된 소스 수 / 전체 소스 수
+    - items_fetched/saved/duplicates: 조회/저장/중복 아이템 수
+    """
+    return get_fetch_progress()
