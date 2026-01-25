@@ -66,7 +66,7 @@ export default function HomePage() {
   }, [])
 
   return (
-    <div className="max-w-screen-xl mx-auto px-2 sm:px-4">
+    <div className="max-w-screen-xl mx-auto px-4 sm:px-6">
       {/* Trending Section */}
       <TrendingSection />
 
