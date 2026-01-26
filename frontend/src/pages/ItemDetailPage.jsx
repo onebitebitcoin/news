@@ -73,10 +73,13 @@ export default function ItemDetailPage() {
 
   if (!item) return null
 
-  // UTC 시간 처리 (Z가 없으면 추가)
-  const publishedDate = item.published_at
-    ? new Date(item.published_at.endsWith('Z') ? item.published_at : item.published_at + 'Z')
-    : null
+  // UTC 시간 처리 (timezone 정보가 없으면 Z 추가)
+  const parseDate = (dateStr) => {
+    if (!dateStr) return null
+    const hasTimezone = dateStr.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(dateStr)
+    return new Date(hasTimezone ? dateStr : dateStr + 'Z')
+  }
+  const publishedDate = parseDate(item.published_at)
   const timeAgo = publishedDate
     ? formatDistanceToNow(publishedDate, { addSuffix: true, locale: ko })
     : ''

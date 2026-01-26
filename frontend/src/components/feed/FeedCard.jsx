@@ -4,11 +4,15 @@ import { formatDistanceToNow } from 'date-fns'
 import { ko } from 'date-fns/locale'
 
 export default function FeedCard({ item, onBookmark }) {
+  // timezone 정보가 없으면 Z 추가
+  const parseDate = (dateStr) => {
+    if (!dateStr) return null
+    const hasTimezone = dateStr.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(dateStr)
+    return new Date(hasTimezone ? dateStr : dateStr + 'Z')
+  }
+
   const timeAgo = item.published_at
-    ? formatDistanceToNow(
-        new Date(item.published_at.endsWith('Z') ? item.published_at : item.published_at + 'Z'),
-        { addSuffix: true, locale: ko }
-      )
+    ? formatDistanceToNow(parseDate(item.published_at), { addSuffix: true, locale: ko })
     : ''
 
   return (

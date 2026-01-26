@@ -10,8 +10,9 @@ import { useFeed, useCategories, useSchedulerStatus, useFetchProgress } from '..
 function getRelativeTime(dateString) {
   if (!dateString) return null
 
-  // UTC 시간임을 명시 (Z가 없으면 추가)
-  const utcDateString = dateString.endsWith('Z') ? dateString : dateString + 'Z'
+  // timezone 정보가 없으면 Z 추가 (이미 +00:00 또는 Z가 있으면 그대로)
+  const hasTimezone = dateString.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(dateString)
+  const utcDateString = hasTimezone ? dateString : dateString + 'Z'
   const date = new Date(utcDateString)
   const now = new Date()
   const diffMs = now - date
