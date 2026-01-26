@@ -39,7 +39,7 @@ export default function HomePage() {
   } = useFeed({ category, search })
 
   const { status: schedulerStatus, refresh: refreshScheduler } = useSchedulerStatus()
-  const { progress: fetchProgress, refresh: refreshProgress } = useFetchProgress()
+  const { progress: fetchProgress, loading: progressLoading, refresh: refreshProgress } = useFetchProgress()
 
   // 마지막 수집 시간 (상대 시간)
   const lastFetchText = useMemo(() => {
@@ -49,6 +49,7 @@ export default function HomePage() {
 
   // 수집 중 여부
   const isFetching = fetchProgress?.status === 'running'
+  const isProgressLoading = progressLoading && !fetchProgress
 
   // 새로고침 핸들러 (피드 + 스케줄러 상태 + 진행 상황 모두 갱신)
   const handleRefresh = useCallback(() => {
@@ -86,10 +87,15 @@ export default function HomePage() {
       <div className="flex items-center justify-between py-3">
         <div className="flex items-center gap-3">
           <h2 className="font-bold text-lg">최신 뉴스</h2>
-          {isFetching ? (
+          {isProgressLoading ? (
+            <span className="text-sm text-zinc-500 flex items-center gap-2">
+              <span className="inline-block w-2 h-2 bg-zinc-500 rounded-full animate-pulse" />
+              상태 확인 중...
+            </span>
+          ) : isFetching ? (
             <span className="text-sm text-amber-500 flex items-center gap-2">
               <span className="inline-block w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
-              수집 중... ({fetchProgress.current_source || '시작'} {fetchProgress.sources_completed}/{fetchProgress.sources_total})
+              수집 중... ({fetchProgress.current_source || '준비'} {fetchProgress.sources_completed}/{fetchProgress.sources_total})
               {fetchProgress.items_fetched > 0 && (
                 <span className="text-zinc-500">
                   - {fetchProgress.items_fetched}개 조회, {fetchProgress.items_saved}개 저장
