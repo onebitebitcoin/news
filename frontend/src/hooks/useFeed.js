@@ -207,8 +207,7 @@ export function useFetchProgress() {
 
   const fetchProgress = useCallback(async () => {
     try {
-      const response = await fetch('/api/v1/admin/fetch-progress')
-      const data = await response.json()
+      const data = await feedApi.getFetchProgress()
       setProgress(data)
       return data
     } catch (err) {
