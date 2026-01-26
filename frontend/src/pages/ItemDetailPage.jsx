@@ -1,25 +1,23 @@
+import { useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, ExternalLink, Bookmark, Clock, User } from 'lucide-react'
-import { bookmarkApi } from '../api/feed'
 import { parseDate, getTimeAgo, formatKoreanDate } from '../utils/dateUtils'
 import { useItemDetail } from '../hooks/useItemDetail'
+import { useBookmarkToggle } from '../hooks/useBookmarkToggle'
 
 export default function ItemDetailPage() {
   const { id } = useParams()
   const { item, loading, error, updateItem } = useItemDetail(id)
 
-  const handleBookmark = async () => {
+  const handleToggle = useCallback((itemId, newState) => {
+    updateItem({ is_bookmarked: newState })
+  }, [updateItem])
+
+  const { toggle } = useBookmarkToggle(handleToggle)
+
+  const handleBookmark = () => {
     if (!item) return
-    try {
-      if (item.is_bookmarked) {
-        await bookmarkApi.remove(item.id)
-      } else {
-        await bookmarkApi.add(item.id)
-      }
-      updateItem({ is_bookmarked: !item.is_bookmarked })
-    } catch (err) {
-      console.error('Bookmark failed:', err)
-    }
+    toggle(item.id, item.is_bookmarked)
   }
 
   if (loading) {
