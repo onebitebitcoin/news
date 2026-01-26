@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, ExternalLink, Bookmark, Clock, User } from 'lucide-react'
-import { formatDistanceToNow, format } from 'date-fns'
-import { ko } from 'date-fns/locale'
 import { feedApi, bookmarkApi } from '../api/feed'
+import { parseDate, getTimeAgo, formatKoreanDate } from '../utils/dateUtils'
 
 export default function ItemDetailPage() {
   const { id } = useParams()
@@ -73,19 +72,9 @@ export default function ItemDetailPage() {
 
   if (!item) return null
 
-  // UTC 시간 처리 (timezone 정보가 없으면 Z 추가)
-  const parseDate = (dateStr) => {
-    if (!dateStr) return null
-    const hasTimezone = dateStr.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(dateStr)
-    return new Date(hasTimezone ? dateStr : dateStr + 'Z')
-  }
   const publishedDate = parseDate(item.published_at)
-  const timeAgo = publishedDate
-    ? formatDistanceToNow(publishedDate, { addSuffix: true, locale: ko })
-    : ''
-  const formattedDate = publishedDate
-    ? format(publishedDate, 'yyyy년 M월 d일 HH:mm', { locale: ko })
-    : ''
+  const timeAgo = getTimeAgo(item.published_at)
+  const formattedDate = formatKoreanDate(item.published_at)
 
   return (
     <div className="max-w-screen-xl mx-auto px-2 sm:px-4 py-4">

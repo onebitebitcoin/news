@@ -1,21 +1,11 @@
 import { useState } from 'react'
 import { Bookmark, Link as LinkIcon, Clock, Sparkles, Check } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
-import { ko } from 'date-fns/locale'
+import { getTimeAgo } from '../../utils/dateUtils'
 
 export default function FeedCard({ item, onBookmark }) {
   const [copied, setCopied] = useState(false)
 
-  // timezone 정보가 없으면 Z 추가
-  const parseDate = (dateStr) => {
-    if (!dateStr) return null
-    const hasTimezone = dateStr.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(dateStr)
-    return new Date(hasTimezone ? dateStr : dateStr + 'Z')
-  }
-
-  const timeAgo = item.published_at
-    ? formatDistanceToNow(parseDate(item.published_at), { addSuffix: true, locale: ko })
-    : ''
+  const timeAgo = getTimeAgo(item.published_at)
 
   const handleCopyLink = async (e) => {
     e.preventDefault()
