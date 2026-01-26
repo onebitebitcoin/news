@@ -7,7 +7,12 @@ from sqlalchemy.orm import Session
 
 from app.repositories.bookmark_repository import BookmarkRepository
 from app.repositories.feed_repository import FeedRepository
-from app.schemas.feed import FeedItemDetail, FeedItemResponse, FeedListResponse
+from app.schemas.feed import (
+    FeedItemDetail,
+    FeedItemDuplicate,
+    FeedItemResponse,
+    FeedListResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +43,7 @@ class FeedService:
         search: Optional[str] = None,
     ) -> FeedListResponse:
         """피드 목록 조회"""
-        items, total = self.feed_repo.get_all(
-            page=page,
-            page_size=page_size,
+        items = self.feed_repo.get_all_items(
             category=category,
             source=source,
             search=search,
@@ -49,24 +52,15 @@ class FeedService:
         # 북마크 상태 확인
         bookmarked_ids = self.bookmark_repo.get_item_ids()
 
-        feed_items = []
-        for item in items:
-            feed_items.append(
-                FeedItemResponse(
-                    id=item.id,
-                    source=item.source,
-                    title=item.title,
-                    summary=item.summary,
-                    url=item.url,
-                    author=item.author,
-                    published_at=item.published_at,
-                    image_url=item.image_url,
-                    category=item.category,
-                    score=item.score or 0,
-                    is_bookmarked=item.id in bookmarked_ids,
-                    is_new=self._is_new_item(item.fetched_at),
-                )
-            )
+        grouped = self._group_items(items)
+        total = len(grouped)
+        start = (page - 1) * page_size
+        end = start + page_size
+
+        feed_items = [
+            self._to_feed_response(group, bookmarked_ids)
+            for group in grouped[start:end]
+        ]
 
         return FeedListResponse(
             items=feed_items,
@@ -136,3 +130,72 @@ class FeedService:
     def get_categories(self) -> List[str]:
         """카테고리 목록"""
         return self.feed_repo.get_categories()
+
+    def get_sources(self) -> List[str]:
+        """소스 목록"""
+        return self.feed_repo.get_sources()
+
+    def _group_items(self, items: List) -> List[List]:
+        """group_id 기준으로 아이템 그룹화"""
+        grouped = {}
+        for item in items:
+            group_id = self._extract_group_id(item) or item.id
+            grouped.setdefault(group_id, []).append(item)
+
+        groups = list(grouped.values())
+        for group in groups:
+            group.sort(
+                key=lambda x: x.published_at or x.fetched_at,
+                reverse=True,
+            )
+
+        groups.sort(
+            key=lambda g: g[0].published_at or g[0].fetched_at,
+            reverse=True,
+        )
+        return groups
+
+    def _extract_group_id(self, item) -> Optional[str]:
+        if not item.raw:
+            return None
+        try:
+            raw = json.loads(item.raw)
+        except json.JSONDecodeError:
+            return None
+        return raw.get("dedup_group_id")
+
+    def _to_feed_response(
+        self,
+        group: List,
+        bookmarked_ids: set,
+    ) -> FeedItemResponse:
+        """그룹 대표 아이템을 응답 모델로 변환"""
+        representative = group[0]
+        duplicates = [
+            FeedItemDuplicate(
+                id=item.id,
+                source=item.source,
+                title=item.title,
+                url=item.url,
+                published_at=item.published_at,
+            )
+            for item in group[1:]
+        ]
+
+        return FeedItemResponse(
+            id=representative.id,
+            source=representative.source,
+            title=representative.title,
+            summary=representative.summary,
+            url=representative.url,
+            author=representative.author,
+            published_at=representative.published_at,
+            image_url=representative.image_url,
+            category=representative.category,
+            score=representative.score or 0,
+            is_bookmarked=representative.id in bookmarked_ids,
+            is_new=self._is_new_item(representative.fetched_at),
+            group_id=self._extract_group_id(representative),
+            duplicate_count=len(duplicates),
+            duplicates=duplicates,
+        )

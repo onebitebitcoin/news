@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models.feed_item import FeedItem
 from app.models.source_status import SourceStatus
+from app.services.dedup_group_service import DedupGroupService
 from app.services.dedup_service import DedupService
 from app.services.sources.base_fetcher import BaseFetcher
 from app.services.sources.bitcoincom import BitcoinComFetcher
@@ -56,6 +57,7 @@ class FetchEngine:
         self.db = db
         self.hours_limit = hours_limit
         self.dedup = DedupService()
+        self.dedup_group = DedupGroupService()
         self.translate = translate
         self.translator = TranslateService() if translate else None
 
@@ -220,6 +222,7 @@ class FetchEngine:
     def _save_item_no_translate(self, item_data: dict) -> bool:
         """아이템 저장 (번역 없이 - 이미 번역된 데이터)"""
         url_hash = item_data.get("url_hash")
+        self.dedup_group.assign_group_id(self.db, item_data)
 
         # FeedItem 생성
         feed_item = FeedItem(
@@ -249,6 +252,7 @@ class FetchEngine:
     def _save_item(self, item_data: dict) -> bool:
         """아이템 저장 (레거시 - 개별 번역 포함, 중복이면 False 반환)"""
         url_hash = item_data.get("url_hash")
+        self.dedup_group.assign_group_id(self.db, item_data)
 
         # 중복 체크
         if self.dedup.is_duplicate(self.db, url_hash):

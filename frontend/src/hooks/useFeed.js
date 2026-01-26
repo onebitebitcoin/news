@@ -121,6 +121,27 @@ export function useCategories() {
   return { categories, loading }
 }
 
+export function useSources() {
+  const [sources, setSources] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchSources = async () => {
+      try {
+        const data = await feedApi.getSources()
+        setSources(data)
+      } catch (err) {
+        console.error('Failed to fetch sources:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchSources()
+  }, [])
+
+  return { sources, loading }
+}
+
 export function useBookmarks() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)

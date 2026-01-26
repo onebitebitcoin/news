@@ -32,6 +32,12 @@ export const feedApi = {
     return data
   },
 
+  // 소스 목록
+  getSources: async () => {
+    const { data } = await client.get('/feed/sources')
+    return data
+  },
+
   // 스케줄러 상태 조회
   getSchedulerStatus: async () => {
     const { data } = await client.get('/admin/scheduler-status')

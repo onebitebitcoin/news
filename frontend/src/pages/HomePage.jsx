@@ -3,8 +3,9 @@ import { RefreshCw } from 'lucide-react'
 import TrendingSection from '../components/feed/TrendingSection'
 import CategoryChips from '../components/filters/CategoryChips'
 import SearchBar from '../components/filters/SearchBar'
+import SourceSelect from '../components/filters/SourceSelect'
 import FeedList from '../components/feed/FeedList'
-import { useFeed, useCategories, useSchedulerStatus, useFetchProgress } from '../hooks/useFeed'
+import { useFeed, useCategories, useFetchProgress, useSchedulerStatus, useSources } from '../hooks/useFeed'
 
 // 상대 시간 표시 함수 (UTC 시간 처리)
 function getRelativeTime(dateString) {
@@ -28,9 +29,11 @@ function getRelativeTime(dateString) {
 
 export default function HomePage() {
   const [category, setCategory] = useState(null)
+  const [source, setSource] = useState(null)
   const [search, setSearch] = useState('')
 
   const { categories } = useCategories()
+  const { sources } = useSources()
   const {
     items,
     loading,
@@ -39,7 +42,7 @@ export default function HomePage() {
     loadMore,
     refresh,
     toggleBookmark,
-  } = useFeed({ category, search })
+  } = useFeed({ category, search, source })
 
   const { status: schedulerStatus, refresh: refreshScheduler } = useSchedulerStatus()
   const { progress: fetchProgress, loading: progressLoading, refresh: refreshProgress } = useFetchProgress()
@@ -65,6 +68,10 @@ export default function HomePage() {
     setCategory(newCategory)
   }, [])
 
+  const handleSourceChange = useCallback((newSource) => {
+    setSource(newSource)
+  }, [])
+
   const handleSearch = useCallback((query) => {
     setSearch(query)
   }, [])
@@ -80,11 +87,18 @@ export default function HomePage() {
       </div>
 
       {/* Category Chips */}
-      <CategoryChips
-        categories={categories}
-        selected={category}
-        onChange={handleCategoryChange}
-      />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <CategoryChips
+          categories={categories}
+          selected={category}
+          onChange={handleCategoryChange}
+        />
+        <SourceSelect
+          sources={sources}
+          selected={source}
+          onChange={handleSourceChange}
+        />
+      </div>
 
       {/* Header */}
       <div className="flex items-center justify-between py-3">

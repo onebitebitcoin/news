@@ -4,6 +4,18 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
+class FeedItemDuplicate(BaseModel):
+    """중복 아이템 요약"""
+    id: str
+    source: str
+    title: str
+    url: str
+    published_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 class FeedItemResponse(BaseModel):
     """피드 아이템 응답"""
     id: str
@@ -18,6 +30,9 @@ class FeedItemResponse(BaseModel):
     score: float = 0
     is_bookmarked: bool = False
     is_new: bool = False
+    group_id: Optional[str] = None
+    duplicate_count: int = 0
+    duplicates: List[FeedItemDuplicate] = []
 
     class Config:
         from_attributes = True

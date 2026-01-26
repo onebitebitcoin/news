@@ -27,6 +27,7 @@ def test_get_feed_with_items(client, sample_feed_item):
     assert len(data["items"]) == 1
     assert data["items"][0]["id"] == "test-001"
     assert data["items"][0]["title"] == "Test Bitcoin Article"
+    assert data["items"][0]["duplicate_count"] == 0
 
 
 def test_get_feed_detail(client, sample_feed_item):
@@ -92,6 +93,14 @@ def test_get_categories(client, sample_feed_item):
     assert response.status_code == 200
     data = response.json()
     assert "Market" in data
+
+
+def test_get_sources(client, sample_feed_item):
+    """소스 목록 조회"""
+    response = client.get("/api/v1/feed/sources")
+    assert response.status_code == 200
+    data = response.json()
+    assert "Test Source" in data
 
 
 def test_get_trending(client, sample_feed_item):

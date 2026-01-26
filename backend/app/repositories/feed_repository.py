@@ -54,6 +54,30 @@ class FeedRepository:
         logger.debug(f"Feed items fetched: {len(items)} / {total}")
         return items, total
 
+    def get_all_items(
+        self,
+        category: Optional[str] = None,
+        source: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> List[FeedItem]:
+        """필터 조건에 맞는 전체 피드 아이템 조회"""
+        query = self.db.query(FeedItem)
+
+        if category:
+            query = query.filter(FeedItem.category == category)
+        if source:
+            query = query.filter(FeedItem.source == source)
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                or_(
+                    FeedItem.title.ilike(search_term),
+                    FeedItem.summary.ilike(search_term),
+                )
+            )
+
+        return query.order_by(desc(FeedItem.published_at)).all()
+
     def get_by_id(self, item_id: str) -> Optional[FeedItem]:
         """ID로 피드 아이템 조회"""
         return self.db.query(FeedItem).filter(FeedItem.id == item_id).first()

@@ -53,6 +53,14 @@ async def get_categories(db: Session = Depends(get_db)):
     return service.get_categories()
 
 
+@router.get("/feed/sources", response_model=List[str])
+async def get_sources(db: Session = Depends(get_db)):
+    """소스 목록"""
+    logger.info("GET /feed/sources")
+    service = FeedService(db)
+    return service.get_sources()
+
+
 @router.get("/feed/{item_id}", response_model=FeedItemDetail)
 async def get_feed_detail(
     item_id: str,
