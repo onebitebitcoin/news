@@ -62,7 +62,7 @@ export default function ItemDetailPage() {
       <div className="max-w-screen-xl mx-auto px-2 sm:px-4 py-4">
         <Link to="/" className="inline-flex items-center gap-2 text-zinc-400 mb-4">
           <ArrowLeft className="w-5 h-5" />
-          <span>Back</span>
+          <span>뒤로</span>
         </Link>
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
           <p className="text-red-400">{error}</p>
@@ -73,7 +73,10 @@ export default function ItemDetailPage() {
 
   if (!item) return null
 
-  const publishedDate = item.published_at ? new Date(item.published_at) : null
+  // UTC 시간 처리 (Z가 없으면 추가)
+  const publishedDate = item.published_at
+    ? new Date(item.published_at.endsWith('Z') ? item.published_at : item.published_at + 'Z')
+    : null
   const timeAgo = publishedDate
     ? formatDistanceToNow(publishedDate, { addSuffix: true, locale: ko })
     : ''
@@ -89,7 +92,7 @@ export default function ItemDetailPage() {
         className="inline-flex items-center gap-2 text-zinc-400 hover:text-white mb-4 transition-colors"
       >
         <ArrowLeft className="w-5 h-5" />
-        <span>Back</span>
+        <span>뒤로</span>
       </Link>
 
       {/* Image */}
@@ -164,7 +167,7 @@ export default function ItemDetailPage() {
           }`}
         >
           <Bookmark className={`w-5 h-5 ${item.is_bookmarked ? 'fill-current' : ''}`} />
-          <span>{item.is_bookmarked ? 'Saved' : 'Save'}</span>
+          <span>{item.is_bookmarked ? '저장됨' : '저장'}</span>
         </button>
         <a
           href={item.url}
@@ -173,7 +176,7 @@ export default function ItemDetailPage() {
           className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
         >
           <ExternalLink className="w-5 h-5" />
-          <span>Read Full Article</span>
+          <span>원문 보기</span>
         </a>
       </div>
     </div>
