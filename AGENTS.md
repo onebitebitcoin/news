@@ -1,8 +1,8 @@
-# Agent Rules
+# Claude Project Rules
 
 ## Language
 - 모든 답변은 한국어로 작성한다.
-- 코드/로그/에러 메시지는 원문을 유지하되, 설명은 한국어로 한다.
+- 코드/로그/에러 메시지는 원문 유지, 설명은 한국어로 한다.
 
 ## SPEC.md 검토 및 스펙 구체화 (CRITICAL)
 
@@ -57,6 +57,39 @@
 - [ ] 답변을 바탕으로 구현 방향을 확정했는가?
 
 **주의**: 불명확한 상태로 구현을 시작하면 나중에 대규모 수정이 필요할 수 있다. 먼저 질문하고 확인받는 것이 효율적이다.
+
+## Plan Mode 필수 (CRITICAL)
+
+**모든 구현 작업은 반드시 Plan Mode로 시작해야 한다.**
+
+### 원칙
+- 코드 작성 전에 **항상 Plan Mode를 사용**하여 계획을 먼저 수립한다.
+- 계획 없이 바로 구현하지 않는다.
+- 사용자의 승인을 받은 후에 구현을 시작한다.
+
+### Plan Mode 진입 시점
+- 새로운 기능 구현 요청을 받았을 때
+- 버그 수정이 복잡할 때
+- 리팩토링 작업을 수행할 때
+- 여러 파일을 수정해야 할 때
+
+### Plan Mode에서 수행할 작업
+1. **요구사항 분석**: 사용자 요청을 정확히 이해
+2. **영향 범위 파악**: 수정이 필요한 파일/모듈 식별
+3. **구현 계획 작성**: 단계별 작업 목록 작성
+4. **위험 요소 식별**: 잠재적 문제점 미리 파악
+5. **사용자 승인**: 계획을 사용자에게 제시하고 승인 요청
+
+### 예외 사항 (Plan Mode 생략 가능)
+- 단순 오타 수정
+- 한 줄 변경 수준의 사소한 수정
+- 사용자가 명시적으로 "바로 수정해줘"라고 요청한 경우
+
+### 체크리스트
+- [ ] Plan Mode로 진입했는가?
+- [ ] 구현 계획을 작성했는가?
+- [ ] 사용자 승인을 받았는가?
+- [ ] 승인 후 구현을 시작했는가?
 
 ## Frontend 개발 규칙 (CRITICAL)
 
@@ -133,73 +166,52 @@ function UserListPage() {
 
 ## Writing / UI Guidelines
 1) 이모지를 사용하지 말고 아이콘을 사용할 것
-   - 문서/설명에서 🎉 같은 이모지 금지
-   - UI 구현에서는 아이콘 컴포넌트(예: lucide-react) 사용을 우선한다.
+   - 텍스트에서 이모지 금지
+   - UI에서는 아이콘 컴포넌트(예: lucide-react) 사용
 
 2) **중첩된 카드뷰는 사용하지 말 것 (CRITICAL)**
-   - Card 안에 또 Card를 넣는 구조 금지
-   - 필요하면 섹션 구분은 Divider, Header, Subsection, Background, Border 등으로 처리한다.
+   - Card 내부에 Card 중첩 금지
+   - 섹션 분리는 divider/heading/spacing/background로 처리
    - 레이아웃 깊이는 최대 2단계까지만 허용
 
 3) **심플한 디자인 유지 (CRITICAL)**
-   - 웹 UI에서 너무 많은 텍스트 설명을 표시하지 말 것
-   - 긴 설명문, 상세 가이드, 도움말 텍스트는 최소화
+   - 웹 UI에 너무 많은 텍스트 설명 표시 금지
+   - 긴 설명문, 상세 가이드는 최소화
    - 필요한 정보만 간결하게 표시
-   - 상세 정보는 툴팁, 모달, 드롭다운 등으로 숨김 처리
-   - "Less is more" 원칙 준수
+   - 상세 정보는 툴팁/모달로 숨김 처리
+   - "Less is more" 원칙
 
-   **좋은 예시**:
+4) **반응형 레이아웃 (모바일 친화적 웹페이지) (CRITICAL)**
+   - **모바일 친화적인 웹페이지**를 기본으로 하되, **PC에서도 최적화된 경험 제공**
+   - 작은 화면 가독성/터치 타깃 최우선
+   - **모바일 좌우 padding은 최소한으로 설정** (예: px-2 또는 px-4)
+   - 항상 UI 업데이트 시 모바일과 PC 양쪽에서 어떻게 보일지 고려
+
+   **반응형 디자인 원칙**:
+   - 모바일: 단일 컬럼, 터치 친화적, 최소 padding
+   - 태블릿: 2컬럼 가능, 적절한 여백
+   - PC: 최대 너비 제한 (max-w-screen-xl 등), 넓은 화면 활용
+
+   **Tailwind CSS 반응형 예시**:
    ```jsx
-   // ✅ 간결한 UI
-   <div>
-     <h2>주소 검색</h2>
-     <Input placeholder="비트코인 주소 입력" />
-     <Button>검색</Button>
-   </div>
-
-   // ❌ 너무 많은 설명
-   <div>
-     <h2>비트코인 주소 검색 기능</h2>
-     <p>이 기능을 사용하면 비트코인 주소를 검색할 수 있습니다...</p>
-     <p>검색 방법: 아래 입력란에 비트코인 주소를 입력하세요...</p>
-     <p>주의사항: 올바른 형식의 주소를 입력해야 합니다...</p>
-     <Input placeholder="비트코인 주소 입력" />
-     <Button>검색</Button>
-     <p>검색 버튼을 클릭하면 결과가 표시됩니다...</p>
+   // 모바일 → 태블릿 → PC 순차 적용
+   <div className="px-2 sm:px-4 md:px-6 lg:px-8 max-w-screen-xl mx-auto">
+     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+       {/* 모바일: 1열, 태블릿: 2열, PC: 3열 */}
+     </div>
    </div>
    ```
 
-4) **모바일 친화적인 레이아웃으로 적용할 것 (CRITICAL)**
-   - 기본을 모바일 우선(Mobile-first)로 설계한다.
-   - 작은 화면에서 가독성(폰트/여백/줄바꿈)과 터치 타깃(버튼/링크)을 우선한다.
-   - **모바일 좌우 padding은 최소한으로 설정** (예: `px-2`, `px-4`)
-   - 항상 UI 업데이트 시 모바일에서 어떻게 보일지 고려
-
-   **Tailwind CSS 예시**:
-   ```jsx
-   // ✅ 모바일 친화적인 padding
-   <div className="px-2 sm:px-4 md:px-6 lg:px-8">
-     {/* 모바일: px-2, 태블릿 이상: px-4+ */}
-   </div>
-
-   // ❌ 모바일에서 공간 낭비
-   <div className="px-8 md:px-12 lg:px-16">
-     {/* 모바일에서 너무 큰 padding */}
-   </div>
-   ```
+   **PC 레이아웃 고려사항**:
+   - 넓은 화면에서 콘텐츠가 너무 퍼지지 않도록 max-width 설정
+   - 사이드바, 다중 컬럼 레이아웃 활용 가능
+   - 호버 상태 스타일 추가 (hover:bg-gray-100 등)
+   - 마우스 사용자를 위한 더 작은 클릭 타깃 허용
 
    **사용자 요청 확인 (CRITICAL)**:
-   - 사용자의 UI 요청이 **웹에만 한정되어 너무 디테일**하면 반드시 되물을 것
-   - 예시 질문: **"이렇게 업데이트하면 모바일에서 레이아웃이 깨질 수 있는데 괜찮나요?"**
-   - 모바일 호환성을 사용자에게 확인받고 진행
-   - 웹 전용 디자인 요청 시 모바일 대안을 함께 제시
-
-   **체크리스트**:
-   - [ ] 모바일 화면에서 UI 깨지지 않는지 확인
-   - [ ] 터치 타깃 크기 44x44px 이상
-   - [ ] 가로 스크롤 발생하지 않는지 확인
-   - [ ] 텍스트 크기 최소 14px 이상 (가독성)
-   - [ ] 버튼/링크 간격 충분한지 확인
+   - 사용자의 UI 요청이 특정 화면에만 한정되면 반드시 되물을 것
+   - 질문 예시: "이 레이아웃을 모바일과 PC 양쪽에서 어떻게 보여줄까요?"
+   - 반응형 호환성을 사용자에게 확인받고 진행
 
 5) 시간/날짜는 항상 한국 시간(Asia/Seoul)을 기준으로 판단한다.
 
@@ -209,6 +221,20 @@ function UserListPage() {
 
 7) 사용자 작업에는 성공/실패 메시지를 항상 노출할 것
    - 저장/추가/삭제/새로고침 등 주요 액션의 결과를 명확히 표시한다.
+
+8) **디자인 레퍼런스 확인 (CRITICAL)**
+   - UI 작업 전 `design/reference/` 폴더에 레퍼런스 이미지가 있는지 확인
+   - 이미지가 있으면 해당 스타일을 분석하여 적용
+   - 이미지가 없으면 사용자에게 디자인 방향을 질문:
+     ```
+     "design/reference 폴더에 레퍼런스 이미지가 없습니다.
+     어떤 스타일로 디자인할까요?
+     1. 깔끔한 미니멀 스타일
+     2. 금융 앱 스타일 (토스, 뱅크샐러드)
+     3. 기본 TailwindCSS 스타일
+     4. 직접 설명해주세요"
+     ```
+   - 레퍼런스 이미지 확인 후 UI 컴포넌트 개발 시작
 
 ## 의존성 관리 및 환경 구축 (CRITICAL)
 
@@ -358,17 +384,17 @@ Dockerfile에 추가해도 될까요?"
 
 ---
 
-## Workflow (필수)
-- 변경 사항이 생기면 아래 순서로 마무리한다.
+## Workflow
+- 코드 수정 후 항상:
   1) **Lint 체크 (테스트 전 필수)**
      - Frontend (React): `npm run lint` (ESLint)
      - Backend (FastAPI): `ruff check .` 또는 `flake8`
      - 에러가 있으면 수정 후 다시 체크
-  2) 테스트 실행(프로젝트 표준 커맨드 사용)
+  2) 테스트 실행 → PASS/FAIL 확인
   3) **테스트 결과를 테이블 형태로 출력 (필수)**
-  4) PASS/FAIL 확인 후, FAIL이면 수정 → 재테스트 반복
+  4) FAIL이면 수정 후 재테스트
   5) **PASS면 반드시 `git add` → `git commit` 수행 (절대 누락 금지)**
-  6) `git push`는 사용자가 명시적으로 요청할 때만 수행한다.
+  6) `git push`는 사용자가 명시적으로 요청할 때만 수행
 
 ### Commit 필수 (CRITICAL)
 **테스트 통과 후 commit을 절대 잊지 말 것!**
@@ -851,65 +877,20 @@ alembic init alembic
 ## Database & API Synchronization (CRITICAL)
 **스키마와 API는 항상 함께 업데이트되어야 한다.**
 
-처음에 만든 스키마와 API가 다른 상태에서 스키마가 업데이트되면 API는 업데이트되지 않기 때문에, 반드시 CRUD 기능에서는 스키마 업데이트와 API 업데이트를 같이 취급해야 한다.
-
-### 원칙
 - 데이터베이스 스키마가 변경되면 반드시 관련 API도 함께 업데이트해야 함
 - CRUD 기능 개발/수정 시 스키마와 API를 항상 같이 취급할 것
-- 스키마만 업데이트하고 API를 업데이트하지 않으면 불일치가 발생하여 런타임 에러 발생
+- 스키마만 업데이트하고 API를 업데이트하지 않으면 불일치가 발생함
 
-### 예시
-- **스키마에 새 필드 추가** → API response model (Pydantic)에도 필드 추가
-- **스키마에서 필드 제거** → API request/response model에서도 해당 필드 제거
-- **스키마 필드 타입 변경** → API validation/serialization 로직도 변경
-- **필드명 변경** → API 모델, 쿼리 로직, 문서 모두 변경
+**예시**:
+- 스키마에 새 필드 추가 → API response model에도 필드 추가
+- 스키마에서 필드 제거 → API에서도 해당 필드 제거
+- 스키마 필드 타입 변경 → API validation/serialization 로직도 변경
 
-### 체크리스트
-스키마 변경 시 반드시 확인할 항목:
-1. [ ] 영향받는 모든 API 엔드포인트 확인
-2. [ ] Pydantic 모델 (request/response schemas) 업데이트
-3. [ ] SQLAlchemy 모델과 Pydantic 모델 일치 확인
-4. [ ] API 문서 (Swagger/OpenAPI) 자동 반영 확인
-5. [ ] 관련 테스트 코드 업데이트
-6. [ ] 마이그레이션 스크립트 작성 (필요시)
-
-### 나쁜 예시
-```python
-# ❌ 스키마만 변경하고 API는 업데이트하지 않음
-# models.py
-class Address(Base):
-    address = Column(String)
-    balance = Column(Float)
-    cluster_id = Column(String)
-    tx_count = Column(Integer)  # 새로 추가
-
-# schemas.py (업데이트 안 함!)
-class AddressResponse(BaseModel):
-    address: str
-    balance: float
-    cluster_id: str
-    # tx_count 누락! → API 응답에 포함되지 않음
-```
-
-### 좋은 예시
-```python
-# ✅ 스키마와 API를 함께 업데이트
-# models.py
-class Address(Base):
-    address = Column(String)
-    balance = Column(Float)
-    cluster_id = Column(String)
-    tx_count = Column(Integer)  # 새로 추가
-
-# schemas.py (함께 업데이트!)
-class AddressResponse(BaseModel):
-    address: str
-    balance: float
-    cluster_id: str
-    tx_count: int  # 추가됨 ✓
-```
-
----
+**체크리스트**:
+1. 스키마 변경 시 영향받는 모든 API 엔드포인트 확인
+2. Pydantic 모델 (request/response) 업데이트
+3. API 문서 (Swagger) 자동 반영 확인
+4. 테스트 코드 업데이트
 
 ## Backend Development - 12-Factor App (CRITICAL)
 
@@ -1109,655 +1090,386 @@ Unix Philosophy의 "작고, 집중된 컴포넌트" 원칙은 현대의 **마이
 
 ## Backend Configuration (CRITICAL)
 
-백엔드 개발 시 반드시 적용해야 할 설정들입니다.
-
 ### Allowed Hosts & CORS
+백엔드 개발 시 다음 설정을 필수로 적용해야 한다:
 
-**필수 설정**:
 1. **Allowed Hosts**: 모든 호스트 허용 (`*`)
 2. **CORS Origin**: CORS origin 에러가 발생하지 않도록 설정
 
-이는 개발 환경에서 프론트엔드와 백엔드 간의 통신 문제를 방지하기 위함입니다.
-
-### FastAPI 설정 방법
-
-**main.py 또는 app/__init__.py**:
+**FastAPI 설정 예시**:
 ```python
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-app = FastAPI(
-    title="AI Coding Template API",
-    description="Bitcoin 블록체인 분석 API",
-    version="1.0.0"
-)
-
-# CORS 미들웨어 설정
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],        # 모든 origin 허용 (개발 환경)
-    allow_credentials=True,     # 쿠키 포함 요청 허용
-    allow_methods=["*"],        # 모든 HTTP 메서드 허용 (GET, POST, PUT, DELETE 등)
-    allow_headers=["*"],        # 모든 헤더 허용
-)
-```
-
-### 환경별 설정 예시
-
-더 나은 방법은 환경 변수를 사용하여 개발/프로덕션 환경을 구분하는 것입니다:
-
-```python
-import os
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-# 환경 설정
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
 app = FastAPI()
 
-# 환경에 따른 CORS 설정
-if ENVIRONMENT == "development":
-    # 개발 환경: 모든 origin 허용
-    origins = ["*"]
-else:
-    # 프로덕션: 특정 origin만 허용
-    origins = [
-        "https://yourdomain.com",
-        "https://www.yourdomain.com",
-    ]
-
+# CORS 설정 - 모든 origin 허용
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],  # 모든 origin 허용
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # 모든 HTTP 메서드 허용
+    allow_headers=["*"],  # 모든 헤더 허용
 )
 ```
 
-### 확인 방법
+**주의사항**:
+- 개발 환경에서는 편의를 위해 모든 origin 허용
+- 프로덕션 환경에서는 보안을 위해 특정 origin만 허용하도록 변경 필요
 
-CORS가 올바르게 설정되었는지 확인:
-```bash
-# 브라우저 개발자 도구 콘솔에서 확인
-# CORS 에러가 없어야 함:
-# ❌ "Access to fetch at '...' from origin '...' has been blocked by CORS policy"
-# ✅ 정상적으로 API 요청이 성공함
+### Trailing Slash 통일 (CRITICAL)
+**Frontend와 Backend에서 URL trailing slash를 반드시 통일해야 한다.**
+
+`/api/users`와 `/api/users/`는 다른 URL로 처리될 수 있어 404 에러의 원인이 됨.
+
+**규칙: Trailing Slash 없이 통일**
+
+```
+✅ 올바른 예시:
+/api/v1/portfolio/summary
+/api/v1/trades
+/api/v1/stocks/AAPL
+
+❌ 잘못된 예시:
+/api/v1/portfolio/summary/
+/api/v1/trades/
+/api/v1/stocks/AAPL/
 ```
 
-### 주의사항
+**Backend (FastAPI) 설정:**
+```python
+from fastapi import FastAPI
 
-- **개발 환경**: 편의를 위해 모든 origin 허용 (`allow_origins=["*"]`)
-- **프로덕션 환경**: 보안을 위해 특정 origin만 허용 (도메인 명시)
-- **allow_credentials=True** 사용 시 `allow_origins=["*"]`는 보안상 권장되지 않으나, 개발 환경에서는 편의성을 우선
+app = FastAPI()
 
----
+# Trailing slash redirect 비활성화
+app.router.redirect_slashes = False
+```
 
-## Git Rules
+**Frontend (Axios) 설정:**
+```javascript
+// API 호출 시 trailing slash 제거
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL,
+});
+
+// URL 정규화 (trailing slash 제거)
+api.interceptors.request.use((config) => {
+  if (config.url && config.url.endsWith('/')) {
+    config.url = config.url.slice(0, -1);
+  }
+  return config;
+});
+```
+
+**체크리스트:**
+- [ ] Backend API 엔드포인트에 trailing slash 없음
+- [ ] Frontend API 호출 URL에 trailing slash 없음
+- [ ] SPEC.md API Design 섹션 URL 형식 통일
+
+## Git
 4) git commit message는 알아서 만들 것
-   - 변경 내용 기반으로 명확하고 간결한 메시지를 자동 생성한다.
+   - 변경 내용 기반으로 명확한 메시지를 자동 생성
    - 커밋 메시지는 한국어로 작성한다.
-   - 가능하면 Conventional Commits 형식(예: `fix: ...`, `feat: ...`, `refactor: ...`)을 따른다.
-- 단, 실행 환경 제약(샌드박스 등)으로 git이 실패하면:
-  - 실패 원인을 사용자에게 알리고, 사용자가 로컬 터미널에서 실행할 수 있도록 필요한 명령을 제시한다.
+   - 가능하면 Conventional Commits 사용
+- 단, 환경 제약으로 git이 실패하면 사용자에게 원인/대안 커맨드를 안내한다.
 
 ---
 
-## Debugging & Logging (중요)
+## Debugging & Logging
 
-### 로그 파일 위치
-- **Backend**: `backend/debug.log`
-- **Frontend**: `frontend/debug.log`
+### 로그 파일
+- **Backend**: `backend/debug.log` - 모든 백엔드 동작 로그
+- **Frontend**: `frontend/debug.log` - 모든 프론트엔드 동작 로그
 
-### 로깅 원칙
-1) **상세한 로그 기록 필수**
-   - 모든 주요 동작에 대해 상세한 로그를 남긴다.
-   - 디버깅이 쉽도록 충분한 컨텍스트 정보를 포함한다.
+### 핫리로드 시 로그 초기화 (CRITICAL)
+**개발 서버 재시작(핫리로드) 시 기존 로그 파일을 삭제하고 새로 생성한다.**
 
-2) **로그 레벨**
-   - `DEBUG`: 상세한 디버깅 정보 (개발 단계)
-   - `INFO`: 일반적인 정보 (주요 동작 시작/완료)
-   - `WARNING`: 경고 (잠재적 문제)
-   - `ERROR`: 에러 (예외 발생, 실패)
-   - `CRITICAL`: 치명적 오류 (서비스 중단 수준)
+이유: 분석해야 할 로그 범위를 줄여 디버깅 효율을 높이기 위함
 
-3) **로그 포맷**
+**Backend (Python) - 서버 시작 시:**
+```python
+import os
+
+# 서버 시작 시 기존 로그 삭제
+LOG_FILE = 'debug.log'
+if os.path.exists(LOG_FILE):
+    os.remove(LOG_FILE)
+    print(f"[LOG] 기존 로그 파일 삭제: {LOG_FILE}")
+```
+
+**Frontend (JavaScript) - 앱 시작 시:**
+```javascript
+// App.jsx 또는 main.jsx 최상단
+if (import.meta.env.DEV) {
+  localStorage.removeItem('debug_logs');
+  console.log('[LOG] 기존 로그 초기화');
+}
+```
+
+**dev.sh 스크립트에서 처리:**
+```bash
+# 개발 서버 시작 전 로그 파일 삭제
+rm -f backend/debug.log frontend/debug.log
+echo "[LOG] 로그 파일 초기화 완료"
+```
+
+### 로깅 필수 사항
+1) **상세한 로그 기록**
+   - 모든 API 요청/응답
+   - 데이터베이스 쿼리
+   - 사용자 인터랙션
+   - 에러 및 예외 (스택 트레이스 포함)
+   - 성능 메트릭 (처리 시간)
+
+2) **로그 포맷**
    ```
-   [YYYY-MM-DD HH:MM:SS] [LEVEL] [파일명:라인] 메시지
+   [타임스탬프] [레벨] [위치] 메시지 [데이터]
    ```
 
-### Backend 로깅 (Python)
+3) **로그 레벨**
+   - DEBUG: 상세 디버깅 정보
+   - INFO: 일반 정보
+   - WARNING: 경고
+   - ERROR: 에러
+   - CRITICAL: 치명적 오류
 
-**설정 예시** (`backend/app/logger.py`):
+### Backend (Python)
 ```python
 import logging
-from datetime import datetime
 
-# 로거 설정
 logging.basicConfig(
     level=logging.DEBUG,
     format='[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s',
     handlers=[
         logging.FileHandler('debug.log', encoding='utf-8'),
-        logging.StreamHandler()  # 콘솔에도 출력
+        logging.StreamHandler()
     ]
 )
 
 logger = logging.getLogger(__name__)
-```
 
-**로깅해야 할 항목**:
-- API 요청/응답 (엔드포인트, 파라미터, 상태 코드)
-- 데이터베이스 쿼리 (SQL, 실행 시간)
-- Bitcoin RPC 호출 (메서드, 파라미터, 응답)
-- 클러스터링 작업 (시작/종료, 처리된 데이터 수)
-- 예외 및 에러 (스택 트레이스 포함)
-- 성능 메트릭 (처리 시간, 메모리 사용량)
-
-**예시**:
-```python
-# API 요청 로깅
+# 사용 예시
 logger.info(f"API Request: GET /api/v1/addresses/{address}")
-
-# 데이터베이스 쿼리
-logger.debug(f"DB Query: SELECT * FROM addresses WHERE cluster_id = {cluster_id}")
-
-# 에러 로깅
-try:
-    result = some_function()
-except Exception as e:
-    logger.error(f"Error in some_function: {str(e)}", exc_info=True)
-
-# 성능 로깅
-import time
-start = time.time()
-process_data()
-logger.info(f"process_data completed in {time.time() - start:.2f}s")
+logger.error(f"Database error: {str(e)}", exc_info=True)
 ```
 
-### Frontend 로깅 (JavaScript/TypeScript)
-
-**설정 예시** (`frontend/src/utils/logger.js`):
+### Frontend (JavaScript)
 ```javascript
-const LOG_LEVELS = {
-  DEBUG: 0,
-  INFO: 1,
-  WARNING: 2,
-  ERROR: 3,
-  CRITICAL: 4
-};
-
-class Logger {
-  constructor() {
-    this.logFile = 'debug.log';
-    this.minLevel = LOG_LEVELS.DEBUG;
-  }
-
-  formatMessage(level, message, data = null) {
+// 로그 유틸리티
+const logger = {
+  log: (level, message, data) => {
     const timestamp = new Date().toISOString();
-    const caller = new Error().stack.split('\n')[3].trim();
-    let log = `[${timestamp}] [${level}] ${message}`;
-    if (data) {
-      log += ` | Data: ${JSON.stringify(data)}`;
-    }
-    return log;
-  }
+    const logMsg = `[${timestamp}] [${level}] ${message}`;
+    console.log(logMsg, data || '');
 
-  async writeLog(level, message, data = null) {
-    const logMessage = this.formatMessage(level, message, data);
-
-    // 콘솔 출력
-    console.log(logMessage);
-
-    // 파일에 저장 (개발 환경)
-    if (import.meta.env.DEV) {
-      // Node.js fs 또는 브라우저 localStorage 사용
-      const logs = JSON.parse(localStorage.getItem('debug_logs') || '[]');
-      logs.push(logMessage);
-      localStorage.setItem('debug_logs', JSON.stringify(logs));
-    }
-  }
-
-  debug(message, data) { this.writeLog('DEBUG', message, data); }
-  info(message, data) { this.writeLog('INFO', message, data); }
-  warning(message, data) { this.writeLog('WARNING', message, data); }
-  error(message, data) { this.writeLog('ERROR', message, data); }
-  critical(message, data) { this.writeLog('CRITICAL', message, data); }
-}
-
-export const logger = new Logger();
-```
-
-**로깅해야 할 항목**:
-- 페이지 로드 및 컴포넌트 마운트
-- API 호출 (URL, 파라미터, 응답 시간, 상태)
-- 사용자 인터랙션 (버튼 클릭, 입력, 검색)
-- 상태 변경 (Redux/Context 상태 업데이트)
-- 렌더링 성능 (컴포넌트 렌더링 시간)
-- 에러 및 예외 (네트워크 오류, 파싱 오류)
-- 브라우저 정보 (User Agent, 화면 크기)
-
-**예시**:
-```javascript
-import { logger } from '@/utils/logger';
-
-// API 호출 로깅
-const fetchAddress = async (address) => {
-  logger.info(`Fetching address data: ${address}`);
-
-  try {
-    const start = performance.now();
-    const response = await fetch(`/api/v1/addresses/${address}`);
-    const duration = performance.now() - start;
-
-    logger.info(`API response received in ${duration.toFixed(2)}ms`, {
-      status: response.status,
-      address
-    });
-
-    return await response.json();
-  } catch (error) {
-    logger.error(`Failed to fetch address: ${address}`, { error: error.message });
-    throw error;
-  }
+    // localStorage에 저장
+    const logs = JSON.parse(localStorage.getItem('debug_logs') || '[]');
+    logs.push({ timestamp, level, message, data });
+    localStorage.setItem('debug_logs', JSON.stringify(logs.slice(-1000)));
+  },
+  debug: (msg, data) => logger.log('DEBUG', msg, data),
+  info: (msg, data) => logger.log('INFO', msg, data),
+  error: (msg, data) => logger.log('ERROR', msg, data)
 };
 
-// 사용자 인터랙션 로깅
-const handleSearchClick = () => {
-  logger.debug('Search button clicked', { query: searchQuery });
-  performSearch(searchQuery);
-};
-
-// 상태 변경 로깅
-useEffect(() => {
-  logger.debug('Cluster data updated', {
-    clusterCount: clusters.length,
-    totalAddresses: clusters.reduce((sum, c) => sum + c.addressCount, 0)
-  });
-}, [clusters]);
+// 사용 예시
+logger.info('Fetching address data', { address });
+logger.error('API request failed', { error: error.message });
 ```
 
-### 로그 파일 관리
+### 로그 확인
+```bash
+# 실시간 로그 모니터링
+tail -f backend/debug.log
+tail -f frontend/debug.log
 
-1) **로그 로테이션**
-   - 로그 파일이 너무 커지지 않도록 주기적으로 순환
-   - 예: `debug.log`, `debug.log.1`, `debug.log.2`
-
-2) **.gitignore에 추가**
-   ```
-   backend/debug.log
-   backend/debug.log.*
-   frontend/debug.log
-   frontend/debug.log.*
-   ```
-
-3) **개발 시 로그 확인**
-   ```bash
-   # 실시간 로그 확인
-   tail -f backend/debug.log
-   tail -f frontend/debug.log
-
-   # 에러만 필터링
-   grep ERROR backend/debug.log
-   ```
-
-### 프로덕션 환경
-
-- 프로덕션에서는 `INFO` 레벨 이상만 로깅
-- 민감한 정보 (비밀번호, 토큰) 로깅 금지
-- 로그 집계 시스템 사용 (Sentry, LogRocket 등)
+# 에러만 필터링
+grep ERROR backend/debug.log
+```
 
 ---
 
-## 사용자에게 에러 표시 (CRITICAL)
+## 사용자에게 에러 표시 (필수)
 
-### 기본 원칙
-**에러 발생 시 사용자에게 자세한 에러 메시지를 웹 UI에 표시해야 합니다.**
+### 원칙
+**에러 발생 시 사용자에게 웹 UI에서 자세한 에러 메시지를 보여주어야 합니다.**
 
-이는 디버깅을 위해 필수적입니다:
-- 개발자가 문제를 빠르게 파악할 수 있음
-- 사용자가 문제를 정확히 보고할 수 있음
-- 로그만으로는 재현하기 어려운 문제를 추적 가능
-
-### Backend에서 에러 응답
-
-**에러 발생 시 상세 정보를 포함한 JSON 응답**:
-
+### Backend
 ```python
 from fastapi import HTTPException
-from fastapi.responses import JSONResponse
 
-@app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    """모든 예외를 캐치하여 상세 정보 반환"""
-
-    logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
-
-    # 개발 환경: 상세 에러 정보 포함
-    if settings.ENVIRONMENT == "development":
-        return JSONResponse(
-            status_code=500,
-            content={
-                "status": "error",
-                "error": {
-                    "type": type(exc).__name__,
-                    "message": str(exc),
-                    "traceback": traceback.format_exc(),
-                    "timestamp": datetime.now().isoformat()
-                }
-            }
-        )
-
-    # 프로덕션: 일반적인 메시지
-    return JSONResponse(
-        status_code=500,
-        content={
-            "status": "error",
-            "error": {
-                "type": "ServerError",
-                "message": "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-                "timestamp": datetime.now().isoformat()
-            }
-        }
-    )
-
-# 특정 엔드포인트에서 에러 처리
 @app.get("/api/v1/addresses/{address}")
 async def get_address(address: str):
     try:
-        result = fetch_address_from_db(address)
-        if not result:
-            raise HTTPException(
-                status_code=404,
-                detail={
-                    "message": f"주소를 찾을 수 없습니다: {address}",
-                    "address": address,
-                    "suggestion": "주소가 올바른지 확인해주세요."
-                }
-            )
+        result = fetch_address(address)
         return result
-
-    except ValueError as e:
-        logger.error(f"Invalid address format: {address}", exc_info=True)
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "message": "잘못된 주소 형식입니다.",
-                "address": address,
-                "error": str(e)
-            }
-        )
-
     except Exception as e:
-        logger.error(f"Error fetching address: {address}", exc_info=True)
+        logger.error(f"Error: {str(e)}", exc_info=True)
+
+        # 개발: 상세 에러 정보 반환
         raise HTTPException(
             status_code=500,
             detail={
-                "message": "주소 조회 중 오류가 발생했습니다.",
+                "message": "주소 조회 중 오류 발생",
                 "error": str(e),
                 "type": type(e).__name__
             }
         )
 ```
 
-### Frontend에서 에러 표시
-
-**1. 에러 토스트/알림 표시**:
-
+### Frontend
 ```javascript
-import { toast } from 'react-hot-toast';  // 또는 다른 알림 라이브러리
-
-const fetchAddress = async (address) => {
-  try {
-    const response = await fetch(`/api/v1/addresses/${address}`);
-
-    if (!response.ok) {
-      const errorData = await response.json();
-
-      // 사용자에게 에러 표시
-      showErrorToUser(errorData);
-
-      throw new Error(errorData.error?.message || 'API 요청 실패');
-    }
-
-    return await response.json();
-
-  } catch (error) {
-    logger.error('Failed to fetch address', { address, error: error.message });
-
-    // 네트워크 에러 등
-    showErrorToUser({
-      error: {
-        message: '네트워크 오류가 발생했습니다.',
-        details: error.message
-      }
-    });
-
-    throw error;
-  }
-};
-
-// 에러를 사용자에게 표시하는 함수
-const showErrorToUser = (errorData) => {
-  const { error } = errorData;
-
-  // Toast 알림으로 표시
+// 에러를 사용자에게 표시
+const handleError = (error) => {
+  // Toast 알림
   toast.error(
     <div>
       <div className="font-bold">{error.message}</div>
-      {error.details && (
-        <div className="text-sm mt-1 opacity-80">{error.details}</div>
+      {import.meta.env.DEV && error.details && (
+        <div className="text-sm mt-1">{error.details}</div>
       )}
-      {error.type && (
-        <div className="text-xs mt-1 opacity-60">타입: {error.type}</div>
-      )}
-    </div>,
-    {
-      duration: 5000,
-      position: 'top-right'
-    }
-  );
-
-  // 또는 모달로 표시
-  // openErrorModal(error);
-};
-```
-
-**2. 전역 에러 바운더리**:
-
-```javascript
-import React from 'react';
-
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    logger.error('React Error Boundary caught error', {
-      error: error.message,
-      stack: error.stack,
-      componentStack: errorInfo.componentStack
-    });
-
-    this.setState({ error, errorInfo });
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-red-50">
-          <div className="max-w-2xl p-8 bg-white rounded-lg shadow-lg">
-            <h2 className="text-2xl font-bold text-red-600 mb-4">
-              오류가 발생했습니다
-            </h2>
-
-            <div className="mb-4">
-              <p className="text-gray-700 mb-2">
-                {this.state.error?.message || '알 수 없는 오류'}
-              </p>
-            </div>
-
-            {/* 개발 환경에서만 상세 정보 표시 */}
-            {import.meta.env.DEV && (
-              <details className="mt-4">
-                <summary className="cursor-pointer text-sm text-gray-600">
-                  상세 정보 보기
-                </summary>
-                <pre className="mt-2 p-4 bg-gray-100 rounded text-xs overflow-auto">
-                  {this.state.error?.stack}
-                  {'\n\n'}
-                  {this.state.errorInfo?.componentStack}
-                </pre>
-              </details>
-            )}
-
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              페이지 새로고침
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
-// App.jsx에서 사용
-function App() {
-  return (
-    <ErrorBoundary>
-      <YourApp />
-    </ErrorBoundary>
-  );
-}
-```
-
-**3. 에러 표시 컴포넌트**:
-
-```javascript
-// ErrorAlert.jsx
-export const ErrorAlert = ({ error, onClose }) => {
-  if (!error) return null;
-
-  return (
-    <div className="fixed top-4 right-4 max-w-md bg-red-50 border-l-4 border-red-500 p-4 shadow-lg rounded">
-      <div className="flex items-start">
-        <div className="flex-shrink-0">
-          {/* Lucide React 아이콘 사용 */}
-          <AlertCircle className="h-5 w-5 text-red-500" />
-        </div>
-
-        <div className="ml-3 flex-1">
-          <h3 className="text-sm font-medium text-red-800">
-            {error.message || '오류 발생'}
-          </h3>
-
-          {error.details && (
-            <p className="mt-2 text-sm text-red-700">
-              {error.details}
-            </p>
-          )}
-
-          {import.meta.env.DEV && error.type && (
-            <p className="mt-1 text-xs text-red-600">
-              타입: {error.type}
-            </p>
-          )}
-
-          {import.meta.env.DEV && error.traceback && (
-            <details className="mt-2">
-              <summary className="text-xs text-red-600 cursor-pointer">
-                스택 트레이스
-              </summary>
-              <pre className="mt-1 text-xs bg-red-100 p-2 rounded overflow-auto max-h-40">
-                {error.traceback}
-              </pre>
-            </details>
-          )}
-        </div>
-
-        <button
-          onClick={onClose}
-          className="ml-3 flex-shrink-0 text-red-500 hover:text-red-700"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
     </div>
   );
+
+  logger.error('Error occurred', error);
 };
 
-// 사용 예시
-function MyComponent() {
-  const [error, setError] = useState(null);
-
-  const handleSubmit = async () => {
-    try {
-      await apiCall();
-    } catch (err) {
-      setError(err.response?.data?.error || { message: err.message });
-    }
-  };
-
-  return (
-    <>
-      <ErrorAlert error={error} onClose={() => setError(null)} />
-      {/* 나머지 UI */}
-    </>
-  );
+// API 호출 시
+try {
+  const response = await fetch('/api/v1/addresses/...');
+  if (!response.ok) {
+    const errorData = await response.json();
+    handleError(errorData.error);
+  }
+} catch (error) {
+  handleError({ message: '네트워크 오류', details: error.message });
 }
 ```
 
-### 에러 메시지 가이드라인
+### 에러 표시 컴포넌트
+```javascript
+export const ErrorAlert = ({ error }) => (
+  <div className="bg-red-50 border-l-4 border-red-500 p-4">
+    <div className="font-bold">{error.message}</div>
+    {import.meta.env.DEV && error.details && (
+      <div className="text-sm mt-2">{error.details}</div>
+    )}
+  </div>
+);
+```
 
-1. **명확성**: 무엇이 잘못되었는지 명확히 표시
-   ```
-   ✅ "주소 형식이 올바르지 않습니다: bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
-   ❌ "오류 발생"
-   ```
-
+### 가이드라인
+1. **명확한 메시지**: 무엇이 잘못되었는지 명확히 표시
 2. **해결 방법 제시**: 사용자가 어떻게 해야 하는지 안내
-   ```
-   ✅ "비트코인 주소를 찾을 수 없습니다. 주소를 다시 확인하거나 데이터 동기화를 기다려주세요."
-   ❌ "404 Not Found"
-   ```
+3. **개발 환경 상세 정보**: 개발 시 스택 트레이스, 에러 타입 표시
+4. **프로덕션 간소화**: 프로덕션에서는 민감 정보 숨김
 
-3. **개발 환경에서만 상세 정보**:
-   - 개발: 스택 트레이스, 에러 타입, 원본 메시지
-   - 프로덕션: 일반적인 메시지만
-
-4. **다국어 지원 고려**:
-   ```javascript
-   const errorMessages = {
-     NETWORK_ERROR: "네트워크 연결을 확인해주세요.",
-     NOT_FOUND: "요청한 리소스를 찾을 수 없습니다.",
-     // ...
-   };
-   ```
-
-### 체크리스트
-
-- [ ] Backend에서 모든 예외에 대해 상세한 에러 응답 반환
-- [ ] Frontend에서 API 에러를 사용자에게 표시
-- [ ] 전역 에러 바운더리 구현
-- [ ] 개발 환경에서 스택 트레이스 표시
-- [ ] 프로덕션에서 민감 정보 숨김
-- [ ] 에러 로그와 UI 표시 모두 수행
+**중요**: 문제 해결을 위해 충분히 상세한 로그를 남기고, **사용자에게도 명확한 에러 메시지를 표시**하는 것이 필수입니다.
 
 ---
 
-**중요**: 디버깅을 위해 충분히 상세한 로그를 남기는 것은 필수입니다. 로그가 부족하면 문제 해결이 어려우므로 항상 주요 동작에 대한 로그를 기록하세요. **또한 에러 발생 시 사용자에게도 명확한 에러 메시지를 보여주어야 합니다.**
+## Claude Code 사용 가이드 (비개발자용)
+
+이 템플릿은 비개발자도 Claude Code를 통해 프로젝트를 생성하고 배포할 수 있도록 설계되었습니다.
+
+### 프로젝트 시작하기
+
+**1. 프로젝트 생성**
+```
+"SPEC.md를 기반으로 프로젝트를 생성해줘"
+```
+- Claude Code가 frontend/, backend/ 폴더와 필요한 파일들을 자동 생성합니다.
+
+**2. 의존성 설치**
+```
+"의존성 설치해줘" 또는 "./install.sh 실행해줘"
+```
+
+**3. 개발 서버 실행**
+```
+"개발 서버 실행해줘" 또는 "./dev.sh 실행해줘"
+```
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8000
+- API 문서: http://localhost:8000/docs
+
+**4. 테스트 실행**
+```
+"테스트 실행해줘" 또는 "./test.sh 실행해줘"
+```
+
+### Railway 배포
+
+**사전 준비** (최초 1회):
+1. Railway 계정 생성: https://railway.app
+2. Railway CLI 설치: `npm install -g @railway/cli`
+3. Railway 로그인: `railway login`
+
+**배포 요청**:
+```
+"Railway에 배포해줘"
+```
+
+Claude Code가 자동으로 수행하는 작업:
+1. 테스트 실행 (통과 확인)
+2. Git 커밋 (변경사항이 있는 경우)
+3. `railway up` 실행 (Docker 빌드 및 배포)
+4. 배포 URL 및 상태 확인
+
+### 문제 해결
+
+**배포 로그 확인**:
+```
+"배포 로그 확인해줘" 또는 "railway logs 실행해줘"
+```
+
+**배포 상태 확인**:
+```
+"배포 상태 확인해줘" 또는 "railway status 실행해줘"
+```
+
+**에러 발생 시**:
+```
+"에러 로그 확인해줘"
+"문제 원인 분석해줘"
+```
+
+### SPEC.md 커스터마이징
+
+새로운 프로젝트를 만들려면 SPEC.md 파일에서 다음을 수정하세요:
+
+1. **프로젝트 이름/설명**: 1.1 Purpose 섹션
+2. **데이터베이스 스키마**: 6. Database Schema 섹션
+3. **API 엔드포인트**: 5. API Design 섹션
+4. **UI 컴포넌트**: 8. Frontend Components 섹션
+
+수정 후 Claude Code에게 "SPEC.md를 기반으로 프로젝트를 생성해줘"라고 요청하면 됩니다.
+
+---
+
+## 배포 설정
+
+### Docker 기반 배포
+
+이 프로젝트는 Dockerfile을 사용하여 Railway에 배포됩니다:
+
+- **빌드**: Multi-stage Docker build
+  - Stage 1: Node.js로 Frontend 빌드
+  - Stage 2: Python으로 Backend 실행 + Frontend 정적 파일 서빙
+- **헬스체크**: `/health` 엔드포인트
+- **포트**: Railway가 자동으로 `PORT` 환경 변수 제공
+
+### 환경 변수 (Railway 대시보드에서 설정)
+
+**필수**:
+- `DATABASE_URL`: PostgreSQL 연결 URL (Railway가 자동 제공)
+- `SECRET_KEY`: 보안 키 (직접 설정)
+- `ENVIRONMENT`: production
+
+**선택**:
+- `LOG_LEVEL`: INFO (기본값)
+- `REDIS_URL`: Redis 연결 URL (캐싱 사용 시)
 
 ---
 

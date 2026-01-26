@@ -11,6 +11,7 @@ from .decrypt import DecryptFetcher
 from .googlenews import GoogleNewsFetcher
 from .optech import OptechFetcher
 from .theblock import TheBlockFetcher
+from .theminermag import TheMinerMagFetcher
 
 __all__ = [
     "BaseFetcher",
@@ -24,4 +25,5 @@ __all__ = [
     "GoogleNewsFetcher",
     "OptechFetcher",
     "TheBlockFetcher",
+    "TheMinerMagFetcher",
 ]

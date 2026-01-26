@@ -21,6 +21,7 @@ from app.services.sources.decrypt import DecryptFetcher
 from app.services.sources.googlenews import GoogleNewsFetcher
 from app.services.sources.optech import OptechFetcher
 from app.services.sources.theblock import TheBlockFetcher
+from app.services.sources.theminermag import TheMinerMagFetcher
 from app.services.translate_service import TranslateService
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ class FetchEngine:
         CoinDeskFetcher,
         CointelegraphFetcher,
         TheBlockFetcher,
+        TheMinerMagFetcher,
         DecryptFetcher,
         BitcoinComFetcher,
         BlockworksFetcher,

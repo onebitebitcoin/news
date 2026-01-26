@@ -59,7 +59,7 @@ describe('FeedCard', () => {
   it('renders external link', () => {
     renderWithRouter(<FeedCard item={mockItem} />)
 
-    const link = screen.getByRole('link', { name: '' })
+    const link = screen.getByRole('link', { name: /Test Bitcoin Article Title/i })
     expect(link).toHaveAttribute('href', 'https://example.com/test')
     expect(link).toHaveAttribute('target', '_blank')
   })
