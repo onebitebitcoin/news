@@ -1,29 +1,12 @@
-import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, ExternalLink, Bookmark, Clock, User } from 'lucide-react'
-import { feedApi, bookmarkApi } from '../api/feed'
+import { bookmarkApi } from '../api/feed'
 import { parseDate, getTimeAgo, formatKoreanDate } from '../utils/dateUtils'
+import { useItemDetail } from '../hooks/useItemDetail'
 
 export default function ItemDetailPage() {
   const { id } = useParams()
-  const [item, setItem] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-
-  useEffect(() => {
-    const fetchItem = async () => {
-      try {
-        setLoading(true)
-        const data = await feedApi.getDetail(id)
-        setItem(data)
-      } catch (err) {
-        setError(err.message || 'Failed to load article')
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchItem()
-  }, [id])
+  const { item, loading, error, updateItem } = useItemDetail(id)
 
   const handleBookmark = async () => {
     if (!item) return
@@ -33,7 +16,7 @@ export default function ItemDetailPage() {
       } else {
         await bookmarkApi.add(item.id)
       }
-      setItem({ ...item, is_bookmarked: !item.is_bookmarked })
+      updateItem({ is_bookmarked: !item.is_bookmarked })
     } catch (err) {
       console.error('Bookmark failed:', err)
     }
