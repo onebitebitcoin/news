@@ -1,9 +1,11 @@
-import { Link } from 'react-router-dom'
-import { Bookmark, ExternalLink, Clock, Sparkles } from 'lucide-react'
+import { useState } from 'react'
+import { Bookmark, Link as LinkIcon, Clock, Sparkles, Check } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { ko } from 'date-fns/locale'
 
 export default function FeedCard({ item, onBookmark }) {
+  const [copied, setCopied] = useState(false)
+
   // timezone 정보가 없으면 Z 추가
   const parseDate = (dateStr) => {
     if (!dateStr) return null
@@ -15,9 +17,21 @@ export default function FeedCard({ item, onBookmark }) {
     ? formatDistanceToNow(parseDate(item.published_at), { addSuffix: true, locale: ko })
     : ''
 
+  const handleCopyLink = async (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    try {
+      await navigator.clipboard.writeText(item.url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
+
   return (
     <article className="bg-zinc-900 rounded-lg overflow-hidden card-hover">
-      <Link to={`/item/${item.id}`} className="block">
+      <a href={item.url} target="_blank" rel="noopener noreferrer" className="block">
         {/* 이미지 */}
         {item.image_url && (
           <div className="aspect-video bg-zinc-800 overflow-hidden relative">
@@ -74,7 +88,7 @@ export default function FeedCard({ item, onBookmark }) {
             </div>
           </div>
         </div>
-      </Link>
+      </a>
 
       {/* 액션 버튼 */}
       <div className="flex items-center gap-2 px-3 pb-3">
@@ -91,15 +105,17 @@ export default function FeedCard({ item, onBookmark }) {
         >
           <Bookmark className={`w-4 h-4 ${item.is_bookmarked ? 'fill-current' : ''}`} />
         </button>
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="p-2 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
-          onClick={(e) => e.stopPropagation()}
+        <button
+          onClick={handleCopyLink}
+          className={`p-2 rounded-lg transition-colors ${
+            copied
+              ? 'bg-green-500/20 text-green-500'
+              : 'bg-zinc-800 text-zinc-400 hover:text-white'
+          }`}
+          title="링크 복사"
         >
-          <ExternalLink className="w-4 h-4" />
-        </a>
+          {copied ? <Check className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}
+        </button>
       </div>
     </article>
   )

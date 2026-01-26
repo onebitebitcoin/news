@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { TrendingUp } from 'lucide-react'
 import { useTrending } from '../../hooks/useFeed'
 
@@ -34,9 +33,11 @@ export default function TrendingSection() {
       </div>
       <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-2 -mx-2 px-2">
         {items.map((item, index) => (
-          <Link
+          <a
             key={item.id}
-            to={`/item/${item.id}`}
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex-shrink-0 w-64 bg-zinc-900 rounded-lg p-3 hover:bg-zinc-800/80 transition-colors"
           >
             <div className="flex gap-3">
@@ -50,7 +51,7 @@ export default function TrendingSection() {
                 <p className="text-xs text-zinc-500 mt-1">{item.source}</p>
               </div>
             </div>
-          </Link>
+          </a>
         ))}
       </div>
     </div>

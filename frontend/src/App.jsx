@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Layout from './components/layout/Layout'
 import HomePage from './pages/HomePage'
-import ItemDetailPage from './pages/ItemDetailPage'
 import BookmarksPage from './pages/BookmarksPage'
 
 function App() {
@@ -10,7 +9,6 @@ function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<HomePage />} />
-          <Route path="item/:id" element={<ItemDetailPage />} />
           <Route path="bookmarks" element={<BookmarksPage />} />
         </Route>
       </Routes>
