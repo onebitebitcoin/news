@@ -161,5 +161,15 @@ echo "종료하려면 Ctrl+C를 누르세요."
 echo "=========================================="
 echo ""
 
+# Tailscale IP 표시
+TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "")
+if [ -n "$TAILSCALE_IP" ]; then
+    echo -e "${GREEN}[Tailscale 접속 주소]${NC}"
+    echo "   Frontend: http://$TAILSCALE_IP:6200"
+    echo "   Backend:  http://$TAILSCALE_IP:6300"
+    echo "   API 문서: http://$TAILSCALE_IP:6300/docs"
+    echo ""
+fi
+
 # 서버 로그 감시
 wait

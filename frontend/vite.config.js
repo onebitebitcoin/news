@@ -9,6 +9,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 6200,
+    host: true,  // 외부 접근 허용 (Tailscale 등)
     proxy: {
       '/api': {
         target: 'http://localhost:6300',
