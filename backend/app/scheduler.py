@@ -2,13 +2,12 @@
 
 import logging
 import os
-from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.database import SessionLocal
+from app.scheduler_state import scheduler_state
 from app.services.fetch_engine import FetchEngine
 
 logger = logging.getLogger(__name__)
@@ -22,55 +21,25 @@ scheduler = AsyncIOScheduler()
 # 수집 주기 (시간)
 FETCH_INTERVAL_HOURS = 3
 
-# 스케줄러 상태 저장 (메모리)
-last_fetch_at: Optional[datetime] = None
-next_fetch_at: Optional[datetime] = None
-
-# 수집 진행 상황 저장 (메모리)
-fetch_progress: dict = {
-    "status": "idle",  # idle, running, completed
-    "started_at": None,
-    "current_source": None,
-    "sources_completed": 0,
-    "sources_total": 0,
-    "items_fetched": 0,
-    "items_saved": 0,
-    "items_duplicates": 0,
-}
-
 
 def get_scheduler_status() -> dict:
     """스케줄러 상태 조회"""
-    return {
-        "last_fetch_at": last_fetch_at.isoformat() if last_fetch_at else None,
-        "next_fetch_at": next_fetch_at.isoformat() if next_fetch_at else None,
-        "interval_hours": FETCH_INTERVAL_HOURS,
-        "is_running": scheduler.running,
-    }
+    return scheduler_state.get_status(FETCH_INTERVAL_HOURS, scheduler.running)
 
 
 def get_fetch_progress() -> dict:
     """수집 진행 상황 조회"""
-    return fetch_progress.copy()
+    return scheduler_state.get_progress()
 
 
 def update_fetch_progress(data: dict):
     """수집 진행 상황 업데이트"""
-    global fetch_progress
-    fetch_progress.update(data)
-
-
-def _update_scheduler_status():
-    """스케줄러 상태 업데이트"""
-    global last_fetch_at, next_fetch_at
-    last_fetch_at = datetime.now(timezone.utc)
-    next_fetch_at = last_fetch_at + timedelta(hours=FETCH_INTERVAL_HOURS)
-    logger.info(f"[Scheduler] Status updated - Last: {last_fetch_at}, Next: {next_fetch_at}")
+    scheduler_state.update_progress(data)
 
 
 async def _progress_callback(data: dict):
     """FetchEngine에서 호출하는 진행 상황 콜백"""
-    update_fetch_progress(data)
+    scheduler_state.update_progress(data)
     logger.debug(f"[Scheduler] Progress update: {data}")
 
 
@@ -79,19 +48,14 @@ async def scheduled_fetch():
     logger.info("[Scheduler] Starting scheduled RSS fetch...")
 
     # 상태 업데이트 (실행 시점 기록)
-    _update_scheduler_status()
+    scheduler_state.update_scheduler_times(FETCH_INTERVAL_HOURS)
+    logger.info(
+        f"[Scheduler] Status updated - Last: {scheduler_state.last_fetch_at}, "
+        f"Next: {scheduler_state.next_fetch_at}"
+    )
 
     # 진행 상황 초기화
-    update_fetch_progress({
-        "status": "running",
-        "started_at": datetime.now(timezone.utc).isoformat(),
-        "current_source": None,
-        "sources_completed": 0,
-        "sources_total": 0,
-        "items_fetched": 0,
-        "items_saved": 0,
-        "items_duplicates": 0,
-    })
+    scheduler_state.reset_progress()
 
     db = SessionLocal()
     try:
@@ -99,12 +63,11 @@ async def scheduled_fetch():
         result = await engine.run_all(progress_callback=_progress_callback)
 
         # 완료 상태 업데이트
-        update_fetch_progress({
-            "status": "completed",
-            "items_fetched": result["total_fetched"],
-            "items_saved": result["total_saved"],
-            "items_duplicates": result["total_duplicates"],
-        })
+        scheduler_state.mark_completed(
+            fetched=result["total_fetched"],
+            saved=result["total_saved"],
+            duplicates=result["total_duplicates"],
+        )
 
         logger.info(
             f"[Scheduler] Fetch complete - "
@@ -113,7 +76,7 @@ async def scheduled_fetch():
         )
     except Exception as e:
         logger.error(f"[Scheduler] Fetch failed: {e}", exc_info=True)
-        update_fetch_progress({"status": "idle"})
+        scheduler_state.mark_idle()
     finally:
         db.close()
 
