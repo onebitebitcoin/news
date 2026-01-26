@@ -33,6 +33,10 @@ class DedupGroupService:
         Transitive Closure 버그 수정:
         - 기존: 모든 그룹 멤버와 비교 → A~B, B~C이면 A,B,C가 같은 그룹
         - 수정: 그룹 대표(가장 오래된 기사)와만 비교 → 눈덩이 효과 방지
+
+        원본 영어 제목 사용:
+        - 번역된 한국어 제목은 영문 토큰이 적어 잘못된 매칭 발생
+        - raw["title"]에서 원본 영어 제목을 가져와 비교
         """
         title = item_data.get("title", "")
         url = item_data.get("url", "")
@@ -44,6 +48,9 @@ class DedupGroupService:
             group_id = self._create_group_id(item_data)
             self._set_group_id_on_raw(item_data, group_id)
             return group_id
+
+        # 원본 영어 제목 가져오기 (번역된 제목 대신)
+        original_title = self._get_original_title(item_data)
 
         # 오래된 것 먼저 조회 (그룹 대표 식별용)
         candidates = (
@@ -72,17 +79,18 @@ class DedupGroupService:
                 # 그룹 없는 아이템
                 ungrouped_items.append(candidate)
 
-        # 1. 기존 그룹 대표와 비교
+        # 1. 기존 그룹 대표와 비교 (원본 영어 제목 사용)
         best_score = 0.0
         best_group_id = None
         for gid, representative in group_representatives.items():
-            score = self._match_score(title, representative.title)
+            rep_original_title = self._get_original_title_from_item(representative)
+            score = self._match_score(original_title, rep_original_title)
             if score is not None and score > best_score:
                 best_score = score
                 best_group_id = gid
                 logger.debug(
-                    f"그룹 대표 매칭: '{title[:30]}...' ~ "
-                    f"'{representative.title[:30]}...' (score={score:.3f}, group={gid})"
+                    f"그룹 대표 매칭: '{original_title[:30]}...' ~ "
+                    f"'{rep_original_title[:30]}...' (score={score:.3f}, group={gid})"
                 )
 
         if best_group_id:
@@ -91,15 +99,16 @@ class DedupGroupService:
 
         # 2. 그룹 없는 아이템과 비교 (새 그룹 형성)
         for candidate in ungrouped_items:
-            score = self._match_score(title, candidate.title)
+            cand_original_title = self._get_original_title_from_item(candidate)
+            score = self._match_score(original_title, cand_original_title)
             if score is not None:
                 # 새 그룹 생성하고 둘 다 추가
                 new_group_id = self._create_group_id(item_data)
                 self._set_group_id_on_raw(item_data, new_group_id)
                 self._set_group_id_on_items([candidate], new_group_id)
                 logger.info(
-                    f"새 그룹 생성: '{title[:30]}...' ~ "
-                    f"'{candidate.title[:30]}...' (score={score:.3f}, group={new_group_id})"
+                    f"새 그룹 생성: '{original_title[:30]}...' ~ "
+                    f"'{cand_original_title[:30]}...' (score={score:.3f}, group={new_group_id})"
                 )
                 return new_group_id
 
@@ -107,6 +116,29 @@ class DedupGroupService:
         group_id = self._create_group_id(item_data)
         self._set_group_id_on_raw(item_data, group_id)
         return group_id
+
+    def _get_original_title(self, item_data: dict) -> str:
+        """item_data에서 원본 영어 제목 가져오기"""
+        raw = item_data.get("raw")
+        if isinstance(raw, str):
+            raw = self._parse_raw(raw)
+        elif not isinstance(raw, dict):
+            raw = {}
+
+        # raw["title"]에 원본 영어 제목이 있음
+        original = raw.get("title", "")
+        if original:
+            return original
+        # fallback: 현재 제목 사용
+        return item_data.get("title", "")
+
+    def _get_original_title_from_item(self, item: FeedItem) -> str:
+        """FeedItem에서 원본 영어 제목 가져오기"""
+        raw = self._parse_raw(item.raw)
+        original = raw.get("title", "")
+        if original:
+            return original
+        return item.title or ""
 
     def _match_score(self, title_a: str, title_b: str) -> Optional[float]:
         tokens_a = self._normalize_title(title_a)
