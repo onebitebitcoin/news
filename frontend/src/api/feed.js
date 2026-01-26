@@ -49,6 +49,14 @@ export const feedApi = {
     const { data } = await client.get('/admin/fetch-progress')
     return data
   },
+
+  // 수동 수집 실행
+  runFetch: async (hours) => {
+    const { data } = await client.post('/admin/fetch/run', null, {
+      params: hours ? { hours } : undefined,
+    })
+    return data
+  },
 }
 
 export const bookmarkApi = {

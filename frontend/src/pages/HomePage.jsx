@@ -1,10 +1,11 @@
-import { useState, useCallback, useMemo } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import { CheckCircle2, RefreshCw, XCircle } from 'lucide-react'
 import TrendingSection from '../components/feed/TrendingSection'
 import CategoryChips from '../components/filters/CategoryChips'
 import SearchBar from '../components/filters/SearchBar'
 import SourceSelect from '../components/filters/SourceSelect'
 import FeedList from '../components/feed/FeedList'
+import { feedApi } from '../api/feed'
 import { useFeed, useCategories, useFetchProgress, useSchedulerStatus, useSources } from '../hooks/useFeed'
 
 // 상대 시간 표시 함수 (UTC 시간 처리)
@@ -31,6 +32,9 @@ export default function HomePage() {
   const [category, setCategory] = useState(null)
   const [source, setSource] = useState(null)
   const [search, setSearch] = useState('')
+  const [refreshNotice, setRefreshNotice] = useState(null)
+  const [manualRefreshing, setManualRefreshing] = useState(false)
+  const noticeTimeoutRef = useRef(null)
 
   const { categories } = useCategories()
   const { sources } = useSources()
@@ -58,10 +62,32 @@ export default function HomePage() {
   const isProgressLoading = progressLoading && !fetchProgress
 
   // 새로고침 핸들러 (피드 + 스케줄러 상태 + 진행 상황 모두 갱신)
-  const handleRefresh = useCallback(() => {
-    refresh()
-    refreshScheduler()
-    refreshProgress()
+  const handleRefresh = useCallback(async () => {
+    if (noticeTimeoutRef.current) {
+      clearTimeout(noticeTimeoutRef.current)
+    }
+
+    setManualRefreshing(true)
+    setRefreshNotice({ type: 'info', message: '수집을 시작합니다.' })
+
+    try {
+      const result = await feedApi.runFetch()
+      await refreshProgress()
+      await refreshScheduler()
+      await refresh()
+
+      const saved = result?.total_saved ?? 0
+      setRefreshNotice({ type: 'success', message: `수집 완료. ${saved}개 저장됨.` })
+    } catch (err) {
+      const detailMessage = err?.response?.data?.detail?.message
+      const message = detailMessage || '수집 요청에 실패했습니다.'
+      setRefreshNotice({ type: 'error', message })
+    } finally {
+      setManualRefreshing(false)
+      noticeTimeoutRef.current = setTimeout(() => {
+        setRefreshNotice(null)
+      }, 5000)
+    }
   }, [refresh, refreshScheduler, refreshProgress])
 
   const handleCategoryChange = useCallback((newCategory) => {
@@ -74,6 +100,14 @@ export default function HomePage() {
 
   const handleSearch = useCallback((query) => {
     setSearch(query)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimeoutRef.current) {
+        clearTimeout(noticeTimeoutRef.current)
+      }
+    }
   }, [])
 
   return (
@@ -127,12 +161,31 @@ export default function HomePage() {
         </div>
         <button
           onClick={handleRefresh}
-          disabled={loading}
+          disabled={loading || manualRefreshing || isFetching}
           className="p-2 rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50"
         >
-          <RefreshCw className={`w-5 h-5 text-zinc-400 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-5 h-5 text-zinc-400 ${manualRefreshing ? 'animate-spin' : ''}`} />
         </button>
       </div>
+
+      {refreshNotice && (
+        <div className="mb-3 rounded-lg border px-3 py-2 flex items-center gap-2 text-sm">
+          {refreshNotice.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+          {refreshNotice.type === 'error' && <XCircle className="w-4 h-4 text-red-400" />}
+          {refreshNotice.type === 'info' && <RefreshCw className="w-4 h-4 text-amber-400" />}
+          <span
+            className={
+              refreshNotice.type === 'success'
+                ? 'text-emerald-400'
+                : refreshNotice.type === 'error'
+                  ? 'text-red-400'
+                  : 'text-amber-400'
+            }
+          >
+            {refreshNotice.message}
+          </span>
+        </div>
+      )}
 
       {/* Error */}
       {error && (

@@ -39,7 +39,7 @@ export function useFeed(options = {}) {
   }, [hasNext, loading, page, fetchFeed])
 
   const refresh = useCallback(() => {
-    fetchFeed(1, false)
+    return fetchFeed(1, false)
   }, [fetchFeed])
 
   const toggleBookmark = useCallback(async (itemId) => {
