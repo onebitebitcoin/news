@@ -2,7 +2,6 @@
 
 import json
 import logging
-import re
 from datetime import datetime, timedelta
 from typing import Iterable, Optional
 from urllib.parse import urlparse
@@ -11,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models.feed_item import FeedItem
 from app.services.dedup_service import DedupService
+from app.services.similarity_service import SimilarityService
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +19,9 @@ class DedupGroupService:
     """제목 유사도 기반 그룹화 서비스"""
 
     WINDOW_HOURS = 24
-    JACCARD_THRESHOLD = 0.85
-    JACCARD_NEAR_MIN = 0.80
-    LEVENSHTEIN_THRESHOLD = 0.85
-    STOPWORDS = {
-        "a", "an", "the", "and", "or", "to", "for", "of", "in", "on", "at",
-        "with", "by", "from", "as", "is", "are", "be", "this", "that", "will",
-    }
+
+    def __init__(self):
+        self.similarity = SimilarityService()
 
     def assign_group_id(self, db: Session, item_data: dict) -> str:
         """유사도 기준 그룹 ID 할당 (그룹 대표와만 비교)
@@ -141,65 +137,8 @@ class DedupGroupService:
         return item.title or ""
 
     def _match_score(self, title_a: str, title_b: str) -> Optional[float]:
-        tokens_a = self._normalize_title(title_a)
-        tokens_b = self._normalize_title(title_b)
-        jaccard = self._jaccard_similarity(tokens_a, tokens_b)
-
-        if jaccard >= self.JACCARD_THRESHOLD:
-            return jaccard
-
-        if self.JACCARD_NEAR_MIN <= jaccard < self.JACCARD_THRESHOLD:
-            ratio = self._levenshtein_ratio(title_a.lower(), title_b.lower())
-            if ratio >= self.LEVENSHTEIN_THRESHOLD:
-                return ratio
-
-        return None
-
-    def _normalize_title(self, title: str) -> list[str]:
-        tokens = re.split(r"[^a-z0-9]+", title.lower())
-        return [
-            token for token in tokens
-            if token and token not in self.STOPWORDS and len(token) >= 2
-        ]
-
-    @staticmethod
-    def _jaccard_similarity(tokens_a: list[str], tokens_b: list[str]) -> float:
-        if not tokens_a and not tokens_b:
-            return 1.0
-        if not tokens_a or not tokens_b:
-            return 0.0
-
-        set_a = set(tokens_a)
-        set_b = set(tokens_b)
-        return len(set_a & set_b) / len(set_a | set_b)
-
-    @staticmethod
-    def _levenshtein_ratio(text_a: str, text_b: str) -> float:
-        if text_a == text_b:
-            return 1.0
-        if not text_a or not text_b:
-            return 0.0
-
-        len_a = len(text_a)
-        len_b = len(text_b)
-        dp = [[0] * (len_b + 1) for _ in range(len_a + 1)]
-
-        for i in range(len_a + 1):
-            dp[i][0] = i
-        for j in range(len_b + 1):
-            dp[0][j] = j
-
-        for i in range(1, len_a + 1):
-            for j in range(1, len_b + 1):
-                cost = 0 if text_a[i - 1] == text_b[j - 1] else 1
-                dp[i][j] = min(
-                    dp[i - 1][j] + 1,
-                    dp[i][j - 1] + 1,
-                    dp[i - 1][j - 1] + cost,
-                )
-
-        distance = dp[len_a][len_b]
-        return 1 - (distance / max(len_a, len_b))
+        """SimilarityService를 사용하여 매칭 점수 계산"""
+        return self.similarity.match_score(title_a, title_b)
 
     def _get_group_id_from_item(self, item: FeedItem) -> Optional[str]:
         raw = self._parse_raw(item.raw)
