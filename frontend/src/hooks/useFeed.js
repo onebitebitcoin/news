@@ -186,7 +186,8 @@ export function useFetchProgress() {
 
   const fetchProgress = useCallback(async () => {
     try {
-      const data = await feedApi.getFetchProgress()
+      const response = await fetch('/api/v1/admin/fetch-progress')
+      const data = await response.json()
       setProgress(data)
       return data
     } catch (err) {
@@ -198,35 +199,13 @@ export function useFetchProgress() {
   }, [])
 
   useEffect(() => {
-    let intervalId = null
-    let isMounted = true
+    // 즉시 첫 번째 호출
+    fetchProgress()
 
-    const startPolling = async () => {
-      const data = await fetchProgress()
-      if (!isMounted) return
+    // 2초마다 폴링 (수집 중일 때 실시간 업데이트)
+    const intervalId = setInterval(fetchProgress, 2000)
 
-      // 수집 중이면 2초, 아니면 30초 간격
-      const interval = data?.status === 'running' ? 2000 : 30000
-
-      intervalId = setInterval(async () => {
-        const newData = await fetchProgress()
-        if (!isMounted) return
-
-        // 상태가 변경되면 interval 재설정
-        const newInterval = newData?.status === 'running' ? 2000 : 30000
-        if (newInterval !== interval) {
-          clearInterval(intervalId)
-          intervalId = setInterval(() => fetchProgress(), newInterval)
-        }
-      }, interval)
-    }
-
-    startPolling()
-
-    return () => {
-      isMounted = false
-      if (intervalId) clearInterval(intervalId)
-    }
+    return () => clearInterval(intervalId)
   }, [fetchProgress])
 
   return { progress, loading, refresh: fetchProgress }
