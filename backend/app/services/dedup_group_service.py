@@ -28,7 +28,12 @@ class DedupGroupService:
     }
 
     def assign_group_id(self, db: Session, item_data: dict) -> str:
-        """유사도 기준 그룹 ID 할당 (DB 저장)"""
+        """유사도 기준 그룹 ID 할당 (그룹 대표와만 비교)
+
+        Transitive Closure 버그 수정:
+        - 기존: 모든 그룹 멤버와 비교 → A~B, B~C이면 A,B,C가 같은 그룹
+        - 수정: 그룹 대표(가장 오래된 기사)와만 비교 → 눈덩이 효과 방지
+        """
         title = item_data.get("title", "")
         url = item_data.get("url", "")
         published_at = item_data.get("published_at") or datetime.utcnow()
@@ -40,41 +45,65 @@ class DedupGroupService:
             self._set_group_id_on_raw(item_data, group_id)
             return group_id
 
+        # 오래된 것 먼저 조회 (그룹 대표 식별용)
         candidates = (
             db.query(FeedItem)
             .filter(FeedItem.published_at >= cutoff)
+            .order_by(FeedItem.published_at.asc())
             .all()
         )
 
-        matches = []
-        best_score = 0.0
-        best_match = None
+        # 그룹별 대표 아이템 수집 (각 그룹의 첫 번째 = 가장 오래된 기사)
+        group_representatives: dict[str, FeedItem] = {}
+        ungrouped_items: list[FeedItem] = []
+
         for candidate in candidates:
             if not candidate.title or not candidate.url:
                 continue
             if urlparse(candidate.url).netloc != domain:
                 continue
 
-            score = self._match_score(title, candidate.title)
-            if score is None:
-                continue
-            matches.append(candidate)
+            gid = self._get_group_id_from_item(candidate)
+            if gid:
+                # 그룹이 있으면 대표만 저장 (첫 번째가 가장 오래된 것)
+                if gid not in group_representatives:
+                    group_representatives[gid] = candidate
+            else:
+                # 그룹 없는 아이템
+                ungrouped_items.append(candidate)
 
-            if score > best_score:
+        # 1. 기존 그룹 대표와 비교
+        best_score = 0.0
+        best_group_id = None
+        for gid, representative in group_representatives.items():
+            score = self._match_score(title, representative.title)
+            if score is not None and score > best_score:
                 best_score = score
-                best_match = candidate
+                best_group_id = gid
+                logger.debug(
+                    f"그룹 대표 매칭: '{title[:30]}...' ~ "
+                    f"'{representative.title[:30]}...' (score={score:.3f}, group={gid})"
+                )
 
-        if matches:
-            existing_group_id = (
-                self._get_group_id_from_item(best_match)
-                if best_match is not None
-                else None
-            )
-            group_id = existing_group_id or self._create_group_id(item_data)
-            self._set_group_id_on_items(matches, group_id)
-            self._set_group_id_on_raw(item_data, group_id)
-            return group_id
+        if best_group_id:
+            self._set_group_id_on_raw(item_data, best_group_id)
+            return best_group_id
 
+        # 2. 그룹 없는 아이템과 비교 (새 그룹 형성)
+        for candidate in ungrouped_items:
+            score = self._match_score(title, candidate.title)
+            if score is not None:
+                # 새 그룹 생성하고 둘 다 추가
+                new_group_id = self._create_group_id(item_data)
+                self._set_group_id_on_raw(item_data, new_group_id)
+                self._set_group_id_on_items([candidate], new_group_id)
+                logger.info(
+                    f"새 그룹 생성: '{title[:30]}...' ~ "
+                    f"'{candidate.title[:30]}...' (score={score:.3f}, group={new_group_id})"
+                )
+                return new_group_id
+
+        # 3. 매칭 없으면 새 그룹 (단독)
         group_id = self._create_group_id(item_data)
         self._set_group_id_on_raw(item_data, group_id)
         return group_id

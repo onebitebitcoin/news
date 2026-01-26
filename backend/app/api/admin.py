@@ -1,5 +1,6 @@
 """Admin API - RSS 수집 관리"""
 
+import json
 import logging
 from typing import List, Optional
 
@@ -8,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models.feed_item import FeedItem
 from app.models.source_status import SourceStatus
 from app.scheduler import get_fetch_progress, get_scheduler_status
 from app.services.fetch_engine import FetchEngine
@@ -219,3 +221,66 @@ async def get_fetch_progress_endpoint():
     - items_fetched/saved/duplicates: 조회/저장/중복 아이템 수
     """
     return get_fetch_progress()
+
+
+class ResetGroupsResponse(BaseModel):
+    """그룹 초기화 결과"""
+    success: bool
+    total_items: int
+    reset_count: int
+    message: str
+
+
+@router.post("/groups/reset", response_model=ResetGroupsResponse)
+async def reset_dedup_groups(db: Session = Depends(get_db)):
+    """
+    모든 dedup_group_id 초기화
+
+    Transitive Closure 버그로 잘못 그룹화된 데이터를 정리합니다.
+    모든 피드 아이템의 dedup_group_id를 삭제하여 재그룹화를 준비합니다.
+    """
+    logger.info("[Admin] Starting dedup_group_id reset")
+
+    try:
+        items = db.query(FeedItem).all()
+        total_items = len(items)
+        reset_count = 0
+
+        for item in items:
+            if not item.raw:
+                continue
+
+            try:
+                raw = json.loads(item.raw)
+            except json.JSONDecodeError:
+                continue
+
+            if "dedup_group_id" in raw:
+                del raw["dedup_group_id"]
+                item.raw = json.dumps(raw)
+                reset_count += 1
+
+        db.commit()
+
+        logger.info(
+            f"[Admin] dedup_group_id reset completed - "
+            f"Total: {total_items}, Reset: {reset_count}"
+        )
+
+        return ResetGroupsResponse(
+            success=True,
+            total_items=total_items,
+            reset_count=reset_count,
+            message=f"{reset_count}개 아이템의 그룹 ID가 초기화되었습니다.",
+        )
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Admin] dedup_group_id reset failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "그룹 ID 초기화 중 오류 발생",
+                "error": str(e),
+            }
+        )
