@@ -6,11 +6,13 @@ import SearchBar from '../components/filters/SearchBar'
 import FeedList from '../components/feed/FeedList'
 import { useFeed, useCategories, useSchedulerStatus, useFetchProgress } from '../hooks/useFeed'
 
-// 상대 시간 표시 함수
+// 상대 시간 표시 함수 (UTC 시간 처리)
 function getRelativeTime(dateString) {
   if (!dateString) return null
 
-  const date = new Date(dateString)
+  // UTC 시간임을 명시 (Z가 없으면 추가)
+  const utcDateString = dateString.endsWith('Z') ? dateString : dateString + 'Z'
+  const date = new Date(utcDateString)
   const now = new Date()
   const diffMs = now - date
   const diffMinutes = Math.floor(diffMs / (1000 * 60))

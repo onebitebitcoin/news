@@ -5,7 +5,10 @@ import { ko } from 'date-fns/locale'
 
 export default function FeedCard({ item, onBookmark }) {
   const timeAgo = item.published_at
-    ? formatDistanceToNow(new Date(item.published_at), { addSuffix: true, locale: ko })
+    ? formatDistanceToNow(
+        new Date(item.published_at.endsWith('Z') ? item.published_at : item.published_at + 'Z'),
+        { addSuffix: true, locale: ko }
+      )
     : ''
 
   return (
