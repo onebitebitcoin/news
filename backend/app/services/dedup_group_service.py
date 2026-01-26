@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.feed_item import FeedItem
 from app.services.dedup_service import DedupService
 from app.services.similarity_service import SimilarityService
+from app.utils.json_utils import safe_parse_json
 
 logger = logging.getLogger(__name__)
 
@@ -174,10 +175,5 @@ class DedupGroupService:
 
     @staticmethod
     def _parse_raw(raw_value: Optional[str]) -> dict:
-        if not raw_value:
-            return {}
-        try:
-            return json.loads(raw_value)
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse raw JSON for group id")
-            return {}
+        """JSON 문자열을 안전하게 파싱"""
+        return safe_parse_json(raw_value, {})
