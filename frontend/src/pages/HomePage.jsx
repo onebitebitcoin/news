@@ -53,9 +53,12 @@ export default function HomePage() {
 
     try {
       const result = await feedApi.runFetch()
-      await refreshProgress()
-      await refreshScheduler()
-      await refresh()
+      // 병렬 실행으로 성능 개선
+      await Promise.all([
+        refreshProgress(),
+        refreshScheduler(),
+        refresh()
+      ])
 
       const saved = result?.total_saved ?? 0
       setRefreshNotice({ type: 'success', message: `수집 완료. ${saved}개 저장됨.` })

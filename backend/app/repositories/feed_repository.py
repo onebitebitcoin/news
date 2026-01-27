@@ -1,7 +1,7 @@
 import logging
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import desc, or_
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.feed_item import FeedItem
@@ -143,3 +143,104 @@ class FeedRepository:
         self.db.commit()
         logger.debug(f"Bulk created {count} feed items")
         return count
+
+    def get_grouped_feed(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        category: Optional[str] = None,
+        source: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> Tuple[List[Dict], int]:
+        """
+        DB 레벨에서 그룹화된 피드 목록 조회
+        group_id가 같은 아이템을 그룹화하고, 각 그룹의 대표 아이템과 중복 개수 반환
+        """
+        # 그룹 키: group_id가 있으면 사용, 없으면 id 사용
+        group_key = func.coalesce(FeedItem.group_id, FeedItem.id)
+
+        # 서브쿼리: 각 그룹의 대표 아이템 ID (가장 최신 published_at)
+        # 그리고 해당 그룹의 아이템 수
+        base_query = self.db.query(FeedItem)
+
+        # 필터 적용
+        if category:
+            base_query = base_query.filter(FeedItem.category == category)
+        if source:
+            base_query = base_query.filter(FeedItem.source == source)
+        if search:
+            search_term = f"%{search}%"
+            base_query = base_query.filter(
+                or_(
+                    FeedItem.title.ilike(search_term),
+                    FeedItem.summary.ilike(search_term),
+                )
+            )
+
+        # 그룹별 대표 아이템 선택 (ROW_NUMBER 사용)
+        # SQLite와 PostgreSQL 모두 지원
+        subquery = (
+            base_query
+            .with_entities(
+                FeedItem.id,
+                group_key.label("group_key"),
+                func.row_number().over(
+                    partition_by=group_key,
+                    order_by=desc(func.coalesce(FeedItem.published_at, FeedItem.fetched_at))
+                ).label("rn")
+            )
+            .subquery()
+        )
+
+        # 대표 아이템만 선택 (rn = 1)
+        representative_ids_query = (
+            self.db.query(subquery.c.id)
+            .filter(subquery.c.rn == 1)
+            .subquery()
+        )
+
+        # 그룹별 아이템 수 계산
+        count_subquery = (
+            base_query
+            .with_entities(
+                group_key.label("group_key"),
+                func.count(FeedItem.id).label("cnt")
+            )
+            .group_by(group_key)
+            .subquery()
+        )
+
+        # 전체 그룹 수 (페이지네이션 계산용)
+        total_groups = self.db.query(func.count()).select_from(count_subquery).scalar()
+
+        # 대표 아이템 조회 (페이지네이션 적용)
+        items_query = (
+            self.db.query(FeedItem)
+            .filter(FeedItem.id.in_(select(representative_ids_query)))
+            .order_by(desc(func.coalesce(FeedItem.published_at, FeedItem.fetched_at)))
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        representative_items = items_query.all()
+
+        # 각 대표 아이템의 그룹에 속한 중복 아이템 조회
+        result = []
+        for item in representative_items:
+            gk = item.group_id or item.id
+
+            # 중복 아이템 조회 (대표 아이템 제외)
+            duplicates_query = base_query.filter(
+                func.coalesce(FeedItem.group_id, FeedItem.id) == gk,
+                FeedItem.id != item.id,
+            ).order_by(desc(func.coalesce(FeedItem.published_at, FeedItem.fetched_at)))
+
+            duplicates = duplicates_query.all()
+
+            result.append({
+                "representative": item,
+                "duplicates": duplicates,
+                "duplicate_count": len(duplicates),
+            })
+
+        logger.debug(f"Grouped feed: {len(result)} groups / {total_groups} total")
+        return result, total_groups

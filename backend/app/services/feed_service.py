@@ -42,8 +42,11 @@ class FeedService:
         source: Optional[str] = None,
         search: Optional[str] = None,
     ) -> FeedListResponse:
-        """피드 목록 조회"""
-        items = self.feed_repo.get_all_items(
+        """피드 목록 조회 (DB 레벨 그룹화 + 페이지네이션)"""
+        # DB에서 그룹화된 결과 조회
+        grouped_data, total = self.feed_repo.get_grouped_feed(
+            page=page,
+            page_size=page_size,
             category=category,
             source=source,
             search=search,
@@ -52,14 +55,9 @@ class FeedService:
         # 북마크 상태 확인
         bookmarked_ids = self.bookmark_repo.get_item_ids()
 
-        grouped = self._group_items(items)
-        total = len(grouped)
-        start = (page - 1) * page_size
-        end = start + page_size
-
         feed_items = [
-            self._to_feed_response(group, bookmarked_ids)
-            for group in grouped[start:end]
+            self._to_feed_response_from_grouped(data, bookmarked_ids)
+            for data in grouped_data
         ]
 
         return FeedListResponse(
@@ -196,6 +194,44 @@ class FeedService:
             is_bookmarked=representative.id in bookmarked_ids,
             is_new=self._is_new_item(representative.fetched_at),
             group_id=self._extract_group_id(representative),
+            duplicate_count=len(duplicates),
+            duplicates=duplicates,
+        )
+
+    def _to_feed_response_from_grouped(
+        self,
+        data: dict,
+        bookmarked_ids: set,
+    ) -> FeedItemResponse:
+        """그룹화된 데이터를 응답 모델로 변환 (DB 레벨 그룹화 결과용)"""
+        representative = data["representative"]
+        duplicate_items = data["duplicates"]
+
+        duplicates = [
+            FeedItemDuplicate(
+                id=item.id,
+                source=item.source,
+                title=item.title,
+                url=item.url,
+                published_at=item.published_at,
+            )
+            for item in duplicate_items
+        ]
+
+        return FeedItemResponse(
+            id=representative.id,
+            source=representative.source,
+            title=representative.title,
+            summary=representative.summary,
+            url=representative.url,
+            author=representative.author,
+            published_at=representative.published_at,
+            image_url=representative.image_url,
+            category=representative.category,
+            score=representative.score or 0,
+            is_bookmarked=representative.id in bookmarked_ids,
+            is_new=self._is_new_item(representative.fetched_at),
+            group_id=representative.group_id,
             duplicate_count=len(duplicates),
             duplicates=duplicates,
         )

@@ -22,6 +22,7 @@ class FeedItem(Base):
     tags = Column(Text, nullable=True)  # JSON string
     score = Column(Float, default=0)
     url_hash = Column(String, nullable=True, index=True)
+    group_id = Column(String, nullable=True, index=True)  # dedup_group_id 저장
     raw = Column(Text, nullable=True)  # JSON string
     image_url = Column(String, nullable=True)
     category = Column(String, nullable=True, index=True)
