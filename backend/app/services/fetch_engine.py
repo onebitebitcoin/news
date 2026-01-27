@@ -1,5 +1,6 @@
 """RSS 통합 수집 엔진"""
 
+import asyncio
 import logging
 from datetime import datetime
 from typing import Callable, Dict, List, Optional, Type
@@ -99,8 +100,27 @@ class FetchEngine:
         if progress_callback:
             await progress_callback({"sources_total": sources_total})
 
-        for i, FetcherClass in enumerate(self.FETCHERS):
-            source_name = FetcherClass.source_name
+        # 1단계: 모든 소스에서 병렬로 fetch (네트워크 I/O)
+        logger.info(f"[FetchEngine] Starting parallel fetch for {sources_total} sources")
+
+        async def fetch_only(FetcherClass: Type[BaseFetcher]):
+            """Fetch만 수행 (DB 작업 없음)"""
+            try:
+                fetcher = FetcherClass(hours_limit=self.hours_limit)
+                items = await fetcher.fetch()
+                return {"source": FetcherClass.source_name, "items": items, "error": None}
+            except Exception as e:
+                logger.error(f"[{FetcherClass.source_name}] Fetch failed: {e}")
+                return {"source": FetcherClass.source_name, "items": [], "error": str(e)}
+
+        fetch_tasks = [fetch_only(FetcherClass) for FetcherClass in self.FETCHERS]
+        fetch_results = await asyncio.gather(*fetch_tasks)
+
+        # 2단계: Pipeline 처리 (DB 작업) - 순차 처리
+        logger.info("[FetchEngine] Processing fetched items sequentially...")
+
+        for i, fetch_result in enumerate(fetch_results):
+            source_name = fetch_result["source"]
 
             if progress_callback:
                 await progress_callback({
@@ -108,7 +128,11 @@ class FetchEngine:
                     "sources_completed": i,
                 })
 
-            source_result = await self._run_source(FetcherClass)
+            source_result = await self._process_fetched_items(
+                source_name,
+                fetch_result["items"],
+                fetch_result["error"]
+            )
             results["sources"][source_name] = source_result
 
             results["total_fetched"] += source_result["fetched"]
@@ -139,25 +163,29 @@ class FetchEngine:
 
         return results
 
-    async def _run_source(self, FetcherClass: Type[BaseFetcher]) -> Dict:
-        """단일 소스에서 수집 실행 - Pipeline 처리"""
-        source_name = FetcherClass.source_name
+    async def _process_fetched_items(
+        self,
+        source_name: str,
+        items: List,
+        fetch_error: Optional[str]
+    ) -> Dict:
+        """Fetch된 아이템들을 Pipeline으로 처리 (DB 작업)"""
         result = {
             "success": False,
-            "fetched": 0,
+            "fetched": len(items),
             "saved": 0,
             "duplicates": 0,
             "translation_failed": 0,
-            "error": None,
+            "error": fetch_error,
         }
 
-        try:
-            # 1. Fetch
-            fetcher = FetcherClass(hours_limit=self.hours_limit)
-            items = await fetcher.fetch()
-            result["fetched"] = len(items)
+        # Fetch 단계에서 이미 에러가 발생한 경우
+        if fetch_error:
+            self._update_source_status(source_name, success=False, error=fetch_error)
+            return result
 
-            # 2. Pipeline 처리
+        try:
+            # Pipeline 처리
             context = PipelineContext(
                 db=self.db,
                 source_name=source_name,
@@ -168,22 +196,47 @@ class FetchEngine:
             for stage in self.stages:
                 context = stage.process(context)
 
-            # 3. 결과 수집
+            # 결과 수집
             result["duplicates"] = context.duplicates
             result["translation_failed"] = context.translation_failed
             result["saved"] = context.saved
 
-            # 4. 상태 업데이트
+            # 상태 업데이트
             self._update_source_status(source_name, success=True)
             result["success"] = True
 
         except Exception as e:
             error_msg = str(e)
-            logger.error(f"[{source_name}] Fetch failed: {error_msg}", exc_info=True)
+            logger.error(f"[{source_name}] Pipeline failed: {error_msg}", exc_info=True)
             result["error"] = error_msg
             self._update_source_status(source_name, success=False, error=error_msg)
 
         return result
+
+    async def _run_source(self, FetcherClass: Type[BaseFetcher]) -> Dict:
+        """단일 소스에서 수집 실행 - Fetch + Pipeline 처리"""
+        source_name = FetcherClass.source_name
+
+        try:
+            # 1. Fetch
+            fetcher = FetcherClass(hours_limit=self.hours_limit)
+            items = await fetcher.fetch()
+
+            # 2. Pipeline 처리
+            return await self._process_fetched_items(source_name, items, None)
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"[{source_name}] Fetch failed: {error_msg}", exc_info=True)
+            self._update_source_status(source_name, success=False, error=error_msg)
+            return {
+                "success": False,
+                "fetched": 0,
+                "saved": 0,
+                "duplicates": 0,
+                "translation_failed": 0,
+                "error": error_msg,
+            }
 
     def _update_source_status(
         self,

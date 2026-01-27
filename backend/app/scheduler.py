@@ -2,8 +2,10 @@
 
 import logging
 import os
+from datetime import datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.database import SessionLocal
@@ -20,6 +22,10 @@ scheduler = AsyncIOScheduler()
 
 # 수집 주기 (시간)
 FETCH_INTERVAL_HOURS = 3
+
+# 서버 시작 후 초기 fetch 지연 시간 (초)
+# 서버가 먼저 응답 가능하도록 지연
+INITIAL_DELAY_SECONDS = 30
 
 
 def get_scheduler_status() -> dict:
@@ -87,9 +93,10 @@ def start_scheduler():
         logger.info("[Scheduler] Skipped in testing environment")
         return
 
-    # 서버 시작 시 즉시 1회 실행
+    # 서버 시작 후 지연 실행 (서버가 먼저 응답 가능하도록)
     scheduler.add_job(
         scheduled_fetch,
+        trigger=DateTrigger(run_date=datetime.now() + timedelta(seconds=INITIAL_DELAY_SECONDS)),
         id="rss_fetch_initial",
         name="RSS Feed Fetch (Initial)",
         replace_existing=True,
@@ -106,7 +113,7 @@ def start_scheduler():
 
     scheduler.start()
     logger.info(
-        f"[Scheduler] Started - Initial fetch + every {FETCH_INTERVAL_HOURS} hours"
+        f"[Scheduler] Started - Initial fetch in {INITIAL_DELAY_SECONDS}s, then every {FETCH_INTERVAL_HOURS}h"
     )
 
 
