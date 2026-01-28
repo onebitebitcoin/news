@@ -18,8 +18,10 @@ from app.services.pipeline import (
 from app.services.sources.base_fetcher import BaseFetcher
 from app.services.sources.bitcoincom import BitcoinComFetcher
 from app.services.sources.bitcoinmagazine import BitcoinMagazineFetcher
+from app.services.sources.blockmedia import BlockmediaFetcher
 from app.services.sources.blockworks import BlockworksFetcher
 from app.services.sources.coindesk import CoinDeskFetcher
+from app.services.sources.coindeskkorea import CoinDeskKoreaFetcher
 from app.services.sources.cointelegraph import CointelegraphFetcher
 from app.services.sources.cryptoslate import CryptoSlateFetcher
 from app.services.sources.decrypt import DecryptFetcher
@@ -27,6 +29,7 @@ from app.services.sources.googlenews import GoogleNewsFetcher
 from app.services.sources.optech import OptechFetcher
 from app.services.sources.theblock import TheBlockFetcher
 from app.services.sources.theminermag import TheMinerMagFetcher
+from app.services.sources.tokenpost import TokenpostFetcher
 from app.services.translate_service import TranslateService
 
 logger = logging.getLogger(__name__)
@@ -48,6 +51,10 @@ class FetchEngine:
         BitcoinComFetcher,
         BlockworksFetcher,
         CryptoSlateFetcher,
+        # 한국어 소스
+        CoinDeskKoreaFetcher,
+        BlockmediaFetcher,
+        TokenpostFetcher,
     ]
 
     def __init__(self, db: Session, hours_limit: int = 24, translate: bool = True):
