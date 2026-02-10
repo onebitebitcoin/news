@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Key, Plus, Trash2, Copy, Check, RefreshCw, AlertTriangle } from 'lucide-react'
+import ErrorAlert from '../components/common/ErrorAlert'
 import { adminApi } from '../api/feed'
 
 export default function ApiKeysPage() {
@@ -102,11 +103,7 @@ export default function ApiKeysPage() {
       </div>
 
       {/* Error */}
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-4">
-          <p className="text-red-400 text-sm">{error}</p>
-        </div>
-      )}
+      <ErrorAlert message={error} />
 
       {/* Create Form */}
       <form onSubmit={handleCreate} className="mb-6">

@@ -79,67 +79,45 @@ export function useFeed(options = {}) {
   }
 }
 
-export function useTrending() {
-  const [items, setItems] = useState([])
+/**
+ * 마운트 시 1회 fetch하는 공통 패턴
+ */
+function useFetchOnMount(fetchFn, initialValue = []) {
+  const [data, setData] = useState(initialValue)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchTrending = async () => {
+    let cancelled = false
+    const run = async () => {
       try {
-        const data = await feedApi.getTrending(5)
-        setItems(data)
+        const result = await fetchFn()
+        if (!cancelled) setData(result)
       } catch (err) {
-        console.error('Failed to fetch trending:', err)
+        console.error('Fetch failed:', err)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-    fetchTrending()
-  }, [])
+    run()
+    return () => { cancelled = true }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { items, loading }
+  return { data, loading }
+}
+
+export function useTrending() {
+  const { data, loading } = useFetchOnMount(() => feedApi.getTrending(5))
+  return { items: data, loading }
 }
 
 export function useCategories() {
-  const [categories, setCategories] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const data = await feedApi.getCategories()
-        setCategories(data)
-      } catch (err) {
-        console.error('Failed to fetch categories:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchCategories()
-  }, [])
-
-  return { categories, loading }
+  const { data, loading } = useFetchOnMount(() => feedApi.getCategories())
+  return { categories: data, loading }
 }
 
 export function useSources() {
-  const [sources, setSources] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchSources = async () => {
-      try {
-        const data = await feedApi.getSources()
-        setSources(data)
-      } catch (err) {
-        console.error('Failed to fetch sources:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchSources()
-  }, [])
-
-  return { sources, loading }
+  const { data, loading } = useFetchOnMount(() => feedApi.getSources())
+  return { sources: data, loading }
 }
 
 export function useBookmarks() {

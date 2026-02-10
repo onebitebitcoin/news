@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { CheckCircle2, RefreshCw, XCircle } from 'lucide-react'
+import ErrorAlert from '../components/common/ErrorAlert'
 import TrendingSection from '../components/feed/TrendingSection'
 import CategoryChips from '../components/filters/CategoryChips'
 import SearchBar from '../components/filters/SearchBar'
@@ -7,7 +8,7 @@ import SourceSelect from '../components/filters/SourceSelect'
 import FeedList from '../components/feed/FeedList'
 import { feedApi } from '../api/feed'
 import { useFeed, useCategories, useFetchProgress, useSchedulerStatus, useSources } from '../hooks/useFeed'
-import { getRelativeTime } from '../utils/dateUtils'
+import { getTimeAgo } from '../utils/dateUtils'
 
 export default function HomePage() {
   const [category, setCategory] = useState(null)
@@ -35,7 +36,7 @@ export default function HomePage() {
   // 마지막 수집 시간 (상대 시간)
   const lastFetchText = useMemo(() => {
     if (!schedulerStatus?.last_fetch_at) return null
-    return getRelativeTime(schedulerStatus.last_fetch_at)
+    return getTimeAgo(schedulerStatus.last_fetch_at)
   }, [schedulerStatus?.last_fetch_at])
 
   // 수집 중 여부
@@ -172,11 +173,7 @@ export default function HomePage() {
       )}
 
       {/* Error */}
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-4">
-          <p className="text-red-400 text-sm">{error}</p>
-        </div>
-      )}
+      <ErrorAlert message={error} />
 
       {/* Feed List */}
       <FeedList
