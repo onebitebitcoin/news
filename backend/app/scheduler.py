@@ -11,6 +11,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from app.database import SessionLocal
 from app.scheduler_state import scheduler_state
 from app.services.fetch_engine import FetchEngine
+from app.services.market_data_service import update_market_data
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,12 @@ FETCH_INTERVAL_HOURS = 3
 # 서버 시작 후 초기 fetch 지연 시간 (초)
 # 서버가 먼저 응답 가능하도록 지연
 INITIAL_DELAY_SECONDS = 30
+
+# 시장 데이터 수집 주기 (초)
+MARKET_DATA_INTERVAL_SECONDS = 60
+
+# 시장 데이터 초기 수집 지연 (초)
+MARKET_DATA_INITIAL_DELAY_SECONDS = 5
 
 
 def get_scheduler_status() -> dict:
@@ -111,9 +118,28 @@ def start_scheduler():
         replace_existing=True,
     )
 
+    # 시장 데이터: 서버 시작 5초 후 초기 수집
+    scheduler.add_job(
+        update_market_data,
+        trigger=DateTrigger(run_date=datetime.now() + timedelta(seconds=MARKET_DATA_INITIAL_DELAY_SECONDS)),
+        id="market_data_initial",
+        name="Market Data Fetch (Initial)",
+        replace_existing=True,
+    )
+
+    # 시장 데이터: 60초마다 반복 수집
+    scheduler.add_job(
+        update_market_data,
+        trigger=IntervalTrigger(seconds=MARKET_DATA_INTERVAL_SECONDS),
+        id="market_data_job",
+        name="Market Data Fetch",
+        replace_existing=True,
+    )
+
     scheduler.start()
     logger.info(
-        f"[Scheduler] Started - Initial fetch in {INITIAL_DELAY_SECONDS}s, then every {FETCH_INTERVAL_HOURS}h"
+        f"[Scheduler] Started - RSS: initial {INITIAL_DELAY_SECONDS}s then every {FETCH_INTERVAL_HOURS}h, "
+        f"Market: initial {MARKET_DATA_INITIAL_DELAY_SECONDS}s then every {MARKET_DATA_INTERVAL_SECONDS}s"
     )
 
 

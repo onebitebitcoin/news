@@ -8,10 +8,12 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import verify_api_key
 from app.database import get_db
+from app.market_data_state import market_data_state
 from app.schemas.external import (
     ExternalArticleDetail,
     ExternalArticleListResponse,
 )
+from app.schemas.market import MarketDataResponse
 from app.services.external_service import ExternalService
 
 logger = logging.getLogger(__name__)
@@ -91,3 +93,10 @@ async def get_categories(db: Session = Depends(get_db)):
     """카테고리 목록 조회"""
     service = ExternalService(db)
     return {"categories": service.get_categories()}
+
+
+@router.get("/market/data", response_model=MarketDataResponse)
+async def get_market_data_external():
+    """외부 제공용 시장 데이터 조회 (API Key 인증 필요)"""
+    data = market_data_state.get_all()
+    return data

@@ -79,6 +79,14 @@ export const adminApi = {
   },
 }
 
+export const marketApi = {
+  // 시장 데이터 조회
+  getData: async () => {
+    const { data } = await client.get('/market/data')
+    return data
+  },
+}
+
 export const bookmarkApi = {
   // 북마크 목록
   getList: async () => {
