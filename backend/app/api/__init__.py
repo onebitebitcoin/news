@@ -1,3 +1,3 @@
-from app.api import bookmarks, feed
+from app.api import bookmarks, external, feed
 
-__all__ = ["feed", "bookmarks"]
+__all__ = ["feed", "bookmarks", "external"]

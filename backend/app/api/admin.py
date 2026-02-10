@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.feed_item import FeedItem
 from app.models.source_status import SourceStatus
+from app.repositories.api_key_repository import ApiKeyRepository
 from app.scheduler import get_fetch_progress, get_scheduler_status
+from app.schemas.api_key import ApiKeyCreate, ApiKeyListResponse, ApiKeyResponse
 from app.services.fetch_engine import FetchEngine
 
 logger = logging.getLogger(__name__)
@@ -284,3 +286,42 @@ async def reset_dedup_groups(db: Session = Depends(get_db)):
                 "error": str(e),
             }
         )
+
+
+# === API Key Management ===
+
+@router.get("/api-keys", response_model=ApiKeyListResponse)
+async def get_api_keys(db: Session = Depends(get_db)):
+    """API 키 목록 조회"""
+    repo = ApiKeyRepository(db)
+    keys = repo.get_all()
+    return ApiKeyListResponse(
+        keys=[ApiKeyResponse.model_validate(k) for k in keys],
+    )
+
+
+@router.post("/api-keys", response_model=ApiKeyResponse, status_code=201)
+async def create_api_key(
+    body: ApiKeyCreate,
+    db: Session = Depends(get_db),
+):
+    """API 키 생성"""
+    repo = ApiKeyRepository(db)
+    api_key = repo.create(name=body.name)
+    return ApiKeyResponse.model_validate(api_key)
+
+
+@router.delete("/api-keys/{key_id}")
+async def delete_api_key(
+    key_id: int,
+    db: Session = Depends(get_db),
+):
+    """API 키 삭제"""
+    repo = ApiKeyRepository(db)
+    deleted = repo.delete(key_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail={"message": f"API 키를 찾을 수 없습니다: {key_id}"},
+        )
+    return {"success": True, "message": "API 키가 삭제되었습니다."}

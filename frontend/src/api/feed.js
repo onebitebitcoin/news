@@ -59,6 +59,26 @@ export const feedApi = {
   },
 }
 
+export const adminApi = {
+  // API 키 목록 조회
+  getApiKeys: async () => {
+    const { data } = await client.get('/admin/api-keys')
+    return data
+  },
+
+  // API 키 생성
+  createApiKey: async (name) => {
+    const { data } = await client.post('/admin/api-keys', { name })
+    return data
+  },
+
+  // API 키 삭제
+  deleteApiKey: async (keyId) => {
+    const { data } = await client.delete(`/admin/api-keys/${keyId}`)
+    return data
+  },
+}
+
 export const bookmarkApi = {
   // 북마크 목록
   getList: async () => {

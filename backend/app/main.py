@@ -76,11 +76,12 @@ async def health_check():
 
 
 # API 라우터 등록
-from app.api import admin, bookmarks, feed  # noqa: E402
+from app.api import admin, bookmarks, external, feed  # noqa: E402
 
 app.include_router(feed.router, prefix="/api/v1", tags=["feed"])
 app.include_router(bookmarks.router, prefix="/api/v1", tags=["bookmarks"])
 app.include_router(admin.router, prefix="/api/v1", tags=["admin"])
+app.include_router(external.router, prefix="/api/v1", tags=["external"])
 
 # Static 파일 서빙 (프로덕션)
 static_dir = os.path.join(os.path.dirname(__file__), "..", "static")

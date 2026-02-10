@@ -36,7 +36,7 @@ def get_db():
 
 def init_db():
     """데이터베이스 테이블 생성"""
-    from app.models import bookmark, feed_item, source_status  # noqa: F401
+    from app.models import api_key, bookmark, feed_item, source_status  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created")
