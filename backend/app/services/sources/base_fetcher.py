@@ -1,5 +1,6 @@
 """RSS Fetcher 기본 인터페이스"""
 
+import asyncio
 import hashlib
 import logging
 import re
@@ -35,7 +36,7 @@ class BaseFetcher(ABC):
         logger.info(f"[{self.source_name}] Fetching RSS from: {self.feed_url}")
 
         try:
-            feed = feedparser.parse(self.feed_url)
+            feed = await asyncio.to_thread(feedparser.parse, self.feed_url)
 
             if feed.bozo and feed.bozo_exception:
                 logger.warning(

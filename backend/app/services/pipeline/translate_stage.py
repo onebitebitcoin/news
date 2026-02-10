@@ -1,5 +1,6 @@
 """번역 스테이지"""
 
+import asyncio
 import logging
 from typing import Optional
 
@@ -18,7 +19,7 @@ class TranslateStage(PipelineStage):
     def __init__(self, translator: Optional[TranslateService] = None):
         self.translator = translator
 
-    def process(self, context: PipelineContext) -> PipelineContext:
+    async def process(self, context: PipelineContext) -> PipelineContext:
         """배치 번역 실행"""
         if not self.translator or not context.items:
             return context
@@ -33,7 +34,9 @@ class TranslateStage(PipelineStage):
             return context
 
         try:
-            context.items = self.translator.translate_batch_sync(context.items)
+            context.items = await asyncio.to_thread(
+                self.translator.translate_batch_sync, context.items
+            )
         except Exception as e:
             logger.error(f"[{context.source_name}] Batch translation error: {e}")
             context.translation_failed = len(context.items)
