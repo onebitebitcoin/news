@@ -42,16 +42,16 @@ async def fetch_upbit_usdt_price() -> float:
         return data["trade_price"]
 
 
-async def fetch_binance_btc_price() -> float:
-    """바이낸스 BTC/USDT 가격 조회"""
+async def fetch_btc_usd_price() -> float:
+    """CoinGecko BTC/USD 가격 조회"""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.get(
-            "https://api.binance.com/api/v3/ticker/price",
-            params={"symbol": "BTCUSDT"},
+            "https://api.coingecko.com/api/v3/simple/price",
+            params={"ids": "bitcoin", "vs_currencies": "usd"},
         )
         resp.raise_for_status()
         data = resp.json()
-        return float(data["price"])
+        return float(data["bitcoin"]["usd"])
 
 
 async def fetch_mempool_fees() -> dict:
@@ -108,20 +108,20 @@ async def update_market_data() -> None:
         logger.error(f"[MarketData] Upbit USDT fetch failed: {e}")
         market_data_state.add_error("upbit_usdt", str(e))
 
-    # 바이낸스 BTC/USDT
-    binance_usd = None
+    # CoinGecko BTC/USD
+    btc_usd = None
     try:
-        binance_usd = await fetch_binance_btc_price()
-        market_data_state.update("bitcoin_price_usd", {"price": binance_usd})
+        btc_usd = await fetch_btc_usd_price()
+        market_data_state.update("bitcoin_price_usd", {"price": btc_usd})
     except Exception as e:
-        logger.error(f"[MarketData] Binance BTC fetch failed: {e}")
-        market_data_state.add_error("binance_btc", str(e))
+        logger.error(f"[MarketData] CoinGecko BTC fetch failed: {e}")
+        market_data_state.add_error("coingecko_btc", str(e))
 
     # 김치 프리미엄 계산
     btc_krw_data = market_data_state.get_all().get("bitcoin_price_krw")
-    if btc_krw_data and binance_usd and usdt_krw:
+    if btc_krw_data and btc_usd and usdt_krw:
         premium = calculate_kimchi_premium(
-            btc_krw_data["price"], binance_usd, usdt_krw
+            btc_krw_data["price"], btc_usd, usdt_krw
         )
         market_data_state.update("kimchi_premium", premium)
 
