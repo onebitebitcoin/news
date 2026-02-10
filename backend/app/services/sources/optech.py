@@ -14,8 +14,10 @@ class OptechFetcher(BaseFetcher):
     """Bitcoin Optech RSS Fetcher"""
 
     source_name = "optech"
+    source_ref = "Bitcoin Optech"
     feed_url = "https://bitcoinops.org/feed.xml"
     category = "technical"
+    default_tags = ["bitcoin", "technical", "development"]
 
     async def normalize(self, entry: dict) -> Optional[dict]:
         """Bitcoin Optech RSS 엔트리 정규화"""
@@ -41,13 +43,13 @@ class OptechFetcher(BaseFetcher):
         return {
             "id": self.generate_id(self.source_name, url_hash),
             "source": self.source_name,
-            "source_ref": "Bitcoin Optech",
+            "source_ref": self.source_ref,
             "title": title,
             "summary": summary,
             "url": link,
-            "author": entry.get("author", "Bitcoin Optech"),
+            "author": entry.get("author", self.source_ref),
             "published_at": published_at,
-            "tags": ["bitcoin", "technical", "development"],
+            "tags": list(self.default_tags),
             "url_hash": url_hash,
             "raw": dict(entry),
             "image_url": None,

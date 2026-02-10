@@ -2,7 +2,8 @@
 
 import hashlib
 import logging
-from abc import ABC, abstractmethod
+import re
+from abc import ABC
 from datetime import datetime, timedelta
 from typing import List, Optional
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -16,8 +17,10 @@ class BaseFetcher(ABC):
     """RSS Fetcher 기본 클래스"""
 
     source_name: str = ""
+    source_ref: str = ""
     feed_url: str = ""
     category: str = "news"
+    default_tags: list = None
 
     def __init__(self, hours_limit: int = 24):
         """
@@ -61,7 +64,6 @@ class BaseFetcher(ABC):
             logger.error(f"[{self.source_name}] Fetch error: {e}", exc_info=True)
             raise
 
-    @abstractmethod
     async def normalize(self, entry: dict) -> Optional[dict]:
         """RSS 엔트리를 표준 형식으로 변환
 
@@ -80,7 +82,77 @@ class BaseFetcher(ABC):
                 - image_url: str (optional)
                 - category: str
         """
-        pass
+        title = entry.get("title", "")
+        link = entry.get("link", "")
+
+        if not title or not link:
+            return None
+
+        published = entry.get("published", entry.get("pubDate", ""))
+        published_at = self.parse_datetime(published) if published else datetime.utcnow()
+
+        url_hash = self.create_url_hash(link)
+
+        tags = self._extract_tags(entry)
+
+        return {
+            "id": self.generate_id(self.source_name, url_hash),
+            "source": self.source_name,
+            "source_ref": self.source_ref,
+            "title": title,
+            "summary": self._extract_summary(entry),
+            "url": link,
+            "author": entry.get("author", entry.get("dc:creator")),
+            "published_at": published_at,
+            "tags": tags or (self.default_tags or ["bitcoin", "crypto"]),
+            "url_hash": url_hash,
+            "raw": dict(entry),
+            "image_url": self._extract_image(entry),
+            "category": self.category,
+        }
+
+    def _extract_summary(self, entry: dict) -> str:
+        """요약 추출"""
+        summary = entry.get("summary", entry.get("description", ""))
+
+        if summary:
+            summary = re.sub(r"<[^>]+>", "", summary)
+            summary = summary.strip()
+            if len(summary) > 300:
+                summary = summary[:297] + "..."
+
+        return summary
+
+    def _extract_image(self, entry: dict) -> Optional[str]:
+        """이미지 URL 추출"""
+        if "media_content" in entry:
+            media = entry["media_content"]
+            if media and len(media) > 0:
+                return media[0].get("url")
+
+        if "media_thumbnail" in entry:
+            thumb = entry["media_thumbnail"]
+            if thumb and len(thumb) > 0:
+                return thumb[0].get("url")
+
+        if "enclosures" in entry:
+            for enc in entry["enclosures"]:
+                if enc.get("type", "").startswith("image/"):
+                    return enc.get("href")
+
+        return None
+
+    def _extract_tags(self, entry: dict) -> list:
+        """태그 추출"""
+        tags = list(self.default_tags or ["bitcoin", "crypto"])
+
+        if "tags" in entry:
+            for tag in entry["tags"]:
+                term = tag.get("term", "")
+                if term and term.lower() not in tags:
+                    tags.append(term.lower())
+
+        return tags[:5]
 
     def _is_within_time_limit(self, item: dict) -> bool:
         """시간 제한 내의 아이템인지 확인"""

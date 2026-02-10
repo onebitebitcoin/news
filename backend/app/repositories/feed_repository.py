@@ -15,18 +15,14 @@ class FeedRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all(
+    def _apply_filters(
         self,
-        page: int = 1,
-        page_size: int = 20,
+        query,
         category: Optional[str] = None,
         source: Optional[str] = None,
         search: Optional[str] = None,
-    ) -> Tuple[List[FeedItem], int]:
-        """피드 목록 조회"""
-        query = self.db.query(FeedItem)
-
-        # 필터
+    ):
+        """공통 필터 적용"""
         if category:
             query = query.filter(FeedItem.category == category)
         if source:
@@ -39,6 +35,20 @@ class FeedRepository:
                     FeedItem.summary.ilike(search_term),
                 )
             )
+        return query
+
+    def get_all(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        category: Optional[str] = None,
+        source: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> Tuple[List[FeedItem], int]:
+        """피드 목록 조회"""
+        query = self._apply_filters(
+            self.db.query(FeedItem), category, source, search
+        )
 
         # 전체 개수
         total = query.count()
@@ -135,23 +145,10 @@ class FeedRepository:
         # 그룹 키: group_id가 있으면 사용, 없으면 id 사용
         group_key = func.coalesce(FeedItem.group_id, FeedItem.id)
 
-        # 서브쿼리: 각 그룹의 대표 아이템 ID (가장 최신 published_at)
-        # 그리고 해당 그룹의 아이템 수
-        base_query = self.db.query(FeedItem)
-
         # 필터 적용
-        if category:
-            base_query = base_query.filter(FeedItem.category == category)
-        if source:
-            base_query = base_query.filter(FeedItem.source == source)
-        if search:
-            search_term = f"%{search}%"
-            base_query = base_query.filter(
-                or_(
-                    FeedItem.title.ilike(search_term),
-                    FeedItem.summary.ilike(search_term),
-                )
-            )
+        base_query = self._apply_filters(
+            self.db.query(FeedItem), category, source, search
+        )
 
         # 그룹별 대표 아이템 선택 (ROW_NUMBER 사용)
         # SQLite와 PostgreSQL 모두 지원
