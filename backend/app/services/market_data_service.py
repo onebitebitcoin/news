@@ -43,15 +43,14 @@ async def fetch_upbit_usdt_price() -> float:
 
 
 async def fetch_btc_usd_price() -> float:
-    """CoinGecko BTC/USD 가격 조회"""
+    """CoinCap BTC/USD 가격 조회"""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.get(
-            "https://api.coingecko.com/api/v3/simple/price",
-            params={"ids": "bitcoin", "vs_currencies": "usd"},
+            "https://api.coincap.io/v2/assets/bitcoin",
         )
         resp.raise_for_status()
         data = resp.json()
-        return float(data["bitcoin"]["usd"])
+        return float(data["data"]["priceUsd"])
 
 
 async def fetch_mempool_fees() -> dict:
@@ -114,8 +113,8 @@ async def update_market_data() -> None:
         btc_usd = await fetch_btc_usd_price()
         market_data_state.update("bitcoin_price_usd", {"price": btc_usd})
     except Exception as e:
-        logger.error(f"[MarketData] CoinGecko BTC fetch failed: {e}")
-        market_data_state.add_error("coingecko_btc", str(e))
+        logger.error(f"[MarketData] CoinCap BTC fetch failed: {e}")
+        market_data_state.add_error("coincap_btc", str(e))
 
     # 김치 프리미엄 계산
     btc_krw_data = market_data_state.get_all().get("bitcoin_price_krw")
