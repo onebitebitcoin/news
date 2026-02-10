@@ -30,6 +30,10 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+# 프로덕션 환경에서 DEBUG 비활성화
+if settings.ENVIRONMENT == "production":
+    settings.DEBUG = False
+
 # Railway 환경에서 PORT 환경변수 사용
 if os.getenv("PORT"):
     settings.PORT = int(os.getenv("PORT"))

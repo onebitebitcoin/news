@@ -14,7 +14,8 @@ RUN npm ci --only=production=false
 # Copy source code
 COPY frontend/ ./
 
-# Build frontend (generates static files in dist/)
+# Build frontend with production API URL (relative path)
+ENV VITE_API_URL=/api/v1
 RUN npm run build
 
 # ============================================
@@ -27,6 +28,7 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python dependencies file
