@@ -24,7 +24,7 @@ export default function DashboardPage() {
   return (
     <div className="max-w-screen-xl mx-auto px-2 sm:px-4 md:px-6 py-4">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-lg font-semibold text-white">Market</h1>
+        <h1 className="text-lg font-semibold text-white">Data</h1>
         <div className="flex items-center gap-3">
           {data?.updated_at && (
             <div className="flex items-center gap-1 text-xs text-zinc-500">
