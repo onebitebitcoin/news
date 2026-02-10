@@ -59,6 +59,9 @@ class BaseFetcher(ABC):
                 f"[{self.source_name}] Fetched {len(items)} items "
                 f"(within {self.hours_limit}h)"
             )
+
+            await self._fill_og_images(items)
+
             return items
 
         except Exception as e:
@@ -142,6 +145,74 @@ class BaseFetcher(ABC):
                     return enc.get("href")
 
         return None
+
+    async def _fetch_og_image(self, url: str) -> Optional[str]:
+        """기사 URL에서 OG image 메타 태그 추출"""
+        import httpx
+
+        try:
+            async with httpx.AsyncClient(
+                timeout=5.0,
+                follow_redirects=True,
+                headers={"User-Agent": "Mozilla/5.0"},
+            ) as client:
+                resp = await client.get(url)
+                if resp.status_code != 200:
+                    return None
+                html = resp.text[:10000]
+                # og:image (property 먼저)
+                match = re.search(
+                    r'<meta\s+[^>]*property=["\']og:image["\'][^>]*content=["\']([^"\']+)["\']',
+                    html,
+                    re.IGNORECASE,
+                )
+                if not match:
+                    # content가 property보다 먼저 오는 경우
+                    match = re.search(
+                        r'<meta\s+[^>]*content=["\']([^"\']+)["\'][^>]*property=["\']og:image["\']',
+                        html,
+                        re.IGNORECASE,
+                    )
+                if not match:
+                    # twitter:image fallback
+                    match = re.search(
+                        r'<meta\s+[^>]*(?:name|property)=["\']twitter:image["\'][^>]*content=["\']([^"\']+)["\']',
+                        html,
+                        re.IGNORECASE,
+                    )
+                return match.group(1) if match else None
+        except Exception as e:
+            logger.debug(
+                f"[{self.source_name}] OG image fetch failed for {url}: {e}"
+            )
+            return None
+
+    async def _fill_og_images(self, items: List[dict]) -> None:
+        """image_url이 없는 아이템들의 OG image를 병렬로 가져온다"""
+        sem = asyncio.Semaphore(5)
+        targets = [
+            (i, item) for i, item in enumerate(items) if not item.get("image_url")
+        ]
+        if not targets:
+            return
+
+        async def _fetch_with_sem(url: str) -> Optional[str]:
+            async with sem:
+                return await self._fetch_og_image(url)
+
+        tasks = [_fetch_with_sem(item["url"]) for _, item in targets]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        filled = 0
+        for (idx, _), result in zip(targets, results):
+            if isinstance(result, str) and result:
+                items[idx]["image_url"] = result
+                filled += 1
+
+        if targets:
+            logger.info(
+                f"[{self.source_name}] OG image: {filled}/{len(targets)} filled"
+            )
 
     def _extract_tags(self, entry: dict) -> list:
         """태그 추출"""
