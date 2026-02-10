@@ -101,24 +101,7 @@ class FeedService:
         """트렌딩 피드 조회"""
         items = self.feed_repo.get_trending(limit)
         bookmarked_ids = self.bookmark_repo.get_item_ids()
-
-        return [
-            FeedItemResponse(
-                id=item.id,
-                source=item.source,
-                title=item.title,
-                summary=item.summary,
-                url=item.url,
-                author=item.author,
-                published_at=item.published_at,
-                image_url=item.image_url,
-                category=item.category,
-                score=item.score or 0,
-                is_bookmarked=item.id in bookmarked_ids,
-                is_new=self._is_new_item(item.fetched_at),
-            )
-            for item in items
-        ]
+        return [self._build_feed_response(item, bookmarked_ids) for item in items]
 
     def get_categories(self) -> List[str]:
         """카테고리 목록"""
@@ -128,15 +111,37 @@ class FeedService:
         """소스 목록"""
         return self.feed_repo.get_sources()
 
+    def _build_feed_response(
+        self,
+        item,
+        bookmarked_ids: set,
+        duplicates: Optional[List[FeedItemDuplicate]] = None,
+    ) -> FeedItemResponse:
+        """FeedItem → FeedItemResponse 변환 (공통 헬퍼)"""
+        return FeedItemResponse(
+            id=item.id,
+            source=item.source,
+            title=item.title,
+            summary=item.summary,
+            url=item.url,
+            author=item.author,
+            published_at=item.published_at,
+            image_url=item.image_url,
+            category=item.category,
+            score=item.score or 0,
+            is_bookmarked=item.id in bookmarked_ids,
+            is_new=self._is_new_item(item.fetched_at),
+            group_id=getattr(item, "group_id", None),
+            duplicate_count=len(duplicates) if duplicates else 0,
+            duplicates=duplicates or [],
+        )
+
     def _to_feed_response_from_grouped(
         self,
         data: dict,
         bookmarked_ids: set,
     ) -> FeedItemResponse:
-        """그룹화된 데이터를 응답 모델로 변환 (DB 레벨 그룹화 결과용)"""
-        representative = data["representative"]
-        duplicate_items = data["duplicates"]
-
+        """그룹화된 데이터를 응답 모델로 변환"""
         duplicates = [
             FeedItemDuplicate(
                 id=item.id,
@@ -145,23 +150,6 @@ class FeedService:
                 url=item.url,
                 published_at=item.published_at,
             )
-            for item in duplicate_items
+            for item in data["duplicates"]
         ]
-
-        return FeedItemResponse(
-            id=representative.id,
-            source=representative.source,
-            title=representative.title,
-            summary=representative.summary,
-            url=representative.url,
-            author=representative.author,
-            published_at=representative.published_at,
-            image_url=representative.image_url,
-            category=representative.category,
-            score=representative.score or 0,
-            is_bookmarked=representative.id in bookmarked_ids,
-            is_new=self._is_new_item(representative.fetched_at),
-            group_id=representative.group_id,
-            duplicate_count=len(duplicates),
-            duplicates=duplicates,
-        )
+        return self._build_feed_response(data["representative"], bookmarked_ids, duplicates)
