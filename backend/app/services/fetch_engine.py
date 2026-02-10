@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models.source_status import SourceStatus
 from app.services.pipeline import (
+    BitcoinFilterStage,
     DedupStage,
     GroupingStage,
     PersistStage,
@@ -72,6 +73,7 @@ class FetchEngine:
         translator = TranslateService() if translate else None
         self.stages = [
             DedupStage(),
+            BitcoinFilterStage(),
             TranslateStage(translator),
             GroupingStage(),
             PersistStage(),
@@ -96,6 +98,7 @@ class FetchEngine:
             "total_fetched": 0,
             "total_saved": 0,
             "total_duplicates": 0,
+            "total_filtered": 0,
             "total_translation_failed": 0,
             "sources": {},
             "started_at": datetime.utcnow().isoformat(),
@@ -145,6 +148,7 @@ class FetchEngine:
             results["total_fetched"] += source_result["fetched"]
             results["total_saved"] += source_result["saved"]
             results["total_duplicates"] += source_result["duplicates"]
+            results["total_filtered"] += source_result.get("filtered", 0)
             results["total_translation_failed"] += source_result.get("translation_failed", 0)
 
             if not source_result["success"]:
@@ -165,6 +169,7 @@ class FetchEngine:
             f"Fetched: {results['total_fetched']}, "
             f"Saved: {results['total_saved']}, "
             f"Duplicates: {results['total_duplicates']}, "
+            f"Filtered: {results['total_filtered']}, "
             f"TranslationFailed: {results['total_translation_failed']} ==="
         )
 
@@ -182,6 +187,7 @@ class FetchEngine:
             "fetched": len(items),
             "saved": 0,
             "duplicates": 0,
+            "filtered": 0,
             "translation_failed": 0,
             "error": fetch_error,
         }
@@ -205,6 +211,7 @@ class FetchEngine:
 
             # 결과 수집
             result["duplicates"] = context.duplicates
+            result["filtered"] = context.filtered
             result["translation_failed"] = context.translation_failed
             result["saved"] = context.saved
 

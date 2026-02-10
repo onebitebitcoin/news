@@ -18,6 +18,7 @@ class PipelineContext:
     # 통계
     fetched: int = 0
     duplicates: int = 0
+    filtered: int = 0
     translation_failed: int = 0
     saved: int = 0
 
