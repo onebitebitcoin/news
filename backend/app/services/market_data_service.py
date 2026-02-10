@@ -30,16 +30,31 @@ async def fetch_upbit_btc_price() -> dict:
         }
 
 
-async def fetch_upbit_usdt_price() -> float:
-    """업비트 USDT/KRW 환율 조회"""
+async def fetch_usd_krw_rate() -> float:
+    """USD/KRW 실제 환율 조회 (Primary: ExchangeRate-API, Fallback: Frankfurter)"""
+    # Primary: ExchangeRate-API
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            resp = await client.get("https://open.er-api.com/v6/latest/USD")
+            resp.raise_for_status()
+            data = resp.json()
+            rate = data["rates"]["KRW"]
+            logger.info(f"[MarketData] USD/KRW rate from ExchangeRate-API: {rate}")
+            return float(rate)
+    except Exception as e:
+        logger.warning(f"[MarketData] ExchangeRate-API failed, trying fallback: {e}")
+
+    # Fallback: Frankfurter
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.get(
-            "https://api.upbit.com/v1/ticker",
-            params={"markets": "KRW-USDT"},
+            "https://api.frankfurter.app/latest",
+            params={"from": "USD", "to": "KRW"},
         )
         resp.raise_for_status()
-        data = resp.json()[0]
-        return data["trade_price"]
+        data = resp.json()
+        rate = data["rates"]["KRW"]
+        logger.info(f"[MarketData] USD/KRW rate from Frankfurter: {rate}")
+        return float(rate)
 
 
 async def fetch_btc_usd_price() -> float:
@@ -77,10 +92,10 @@ async def fetch_fear_greed_index() -> dict:
 
 
 def calculate_kimchi_premium(
-    upbit_krw: float, binance_usd: float, usdt_krw: float
+    upbit_krw: float, binance_usd: float, usd_krw: float
 ) -> float:
     """김치 프리미엄 퍼센트 계산"""
-    binance_krw = binance_usd * usdt_krw
+    binance_krw = binance_usd * usd_krw
     if binance_krw == 0:
         return 0.0
     return round(((upbit_krw / binance_krw) - 1) * 100, 2)
@@ -99,14 +114,14 @@ async def update_market_data() -> None:
         logger.error(f"[MarketData] Upbit BTC fetch failed: {e}")
         market_data_state.add_error("upbit_btc", str(e))
 
-    # 업비트 USDT/KRW
-    usdt_krw = None
+    # USD/KRW 실제 환율
+    usd_krw = None
     try:
-        usdt_krw = await fetch_upbit_usdt_price()
-        market_data_state.update("usdt_krw_rate", usdt_krw)
+        usd_krw = await fetch_usd_krw_rate()
+        market_data_state.update("usd_krw_rate", usd_krw)
     except Exception as e:
-        logger.error(f"[MarketData] Upbit USDT fetch failed: {e}")
-        market_data_state.add_error("upbit_usdt", str(e))
+        logger.error(f"[MarketData] USD/KRW rate fetch failed: {e}")
+        market_data_state.add_error("usd_krw", str(e))
 
     # CoinGecko BTC/USD
     btc_usd = None
@@ -119,9 +134,9 @@ async def update_market_data() -> None:
 
     # 김치 프리미엄 계산
     btc_krw_data = market_data_state.get_all().get("bitcoin_price_krw")
-    if btc_krw_data and btc_usd and usdt_krw:
+    if btc_krw_data and btc_usd and usd_krw:
         premium = calculate_kimchi_premium(
-            btc_krw_data["price"], btc_usd, usdt_krw
+            btc_krw_data["price"], btc_usd, usd_krw
         )
         market_data_state.update("kimchi_premium", premium)
 

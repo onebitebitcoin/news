@@ -39,7 +39,7 @@ class MarketDataResponse(BaseModel):
     """시장 데이터 전체 응답 (모든 필드 Optional - 부분 실패 허용)"""
     bitcoin_price_krw: Optional[BitcoinPriceKRW] = None
     bitcoin_price_usd: Optional[BitcoinPriceUSD] = None
-    usdt_krw_rate: Optional[float] = None
+    usd_krw_rate: Optional[float] = None
     kimchi_premium: Optional[float] = None
     fee_rates: Optional[FeeRates] = None
     fear_greed_index: Optional[FearGreedIndex] = None

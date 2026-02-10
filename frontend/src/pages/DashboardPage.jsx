@@ -54,7 +54,7 @@ export default function DashboardPage() {
           />
           <KimchiPremiumCard
             premium={data?.kimchi_premium}
-            usdtKrwRate={data?.usdt_krw_rate}
+            usdKrwRate={data?.usd_krw_rate}
           />
           <FearGreedCard fearGreed={data?.fear_greed_index} />
           <FeeRatesCard feeRates={data?.fee_rates} />

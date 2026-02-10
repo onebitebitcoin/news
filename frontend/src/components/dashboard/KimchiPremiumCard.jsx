@@ -21,7 +21,7 @@ const formatRate = (value) => {
   return new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 }).format(value)
 }
 
-export default function KimchiPremiumCard({ premium, usdtKrwRate }) {
+export default function KimchiPremiumCard({ premium, usdKrwRate }) {
   const color = getPremiumColor(premium)
   const label = getPremiumLabel(premium)
 
@@ -42,8 +42,8 @@ export default function KimchiPremiumCard({ premium, usdtKrwRate }) {
       </div>
 
       <div className="text-xs">
-        <span className="text-zinc-500">USDT/KRW</span>
-        <div className="text-zinc-300 mt-0.5">{formatRate(usdtKrwRate)} KRW</div>
+        <span className="text-zinc-500">USD/KRW</span>
+        <div className="text-zinc-300 mt-0.5">{formatRate(usdKrwRate)} KRW</div>
       </div>
     </div>
   )

@@ -22,7 +22,7 @@ class MarketDataState:
         self._data: dict[str, Any] = {
             "bitcoin_price_krw": None,
             "bitcoin_price_usd": None,
-            "usdt_krw_rate": None,
+            "usd_krw_rate": None,
             "kimchi_premium": None,
             "fee_rates": None,
             "fear_greed_index": None,
