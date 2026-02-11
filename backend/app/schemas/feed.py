@@ -30,6 +30,7 @@ class FeedItemResponse(BaseModel):
     score: float = 0
     is_bookmarked: bool = False
     is_new: bool = False
+    fetched_at: Optional[datetime] = None
     group_id: Optional[str] = None
     duplicate_count: int = 0
     duplicates: List[FeedItemDuplicate] = []
@@ -41,7 +42,6 @@ class FeedItemResponse(BaseModel):
 class FeedItemDetail(FeedItemResponse):
     """피드 상세 응답"""
     tags: Optional[List[str]] = None
-    fetched_at: datetime
     source_ref: Optional[str] = None
 
     class Config:

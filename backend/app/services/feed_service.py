@@ -137,6 +137,7 @@ class FeedService:
             score=item.score or 0,
             is_bookmarked=item.id in bookmarked_ids,
             is_new=self._is_new_item(item.fetched_at),
+            fetched_at=item.fetched_at,
             group_id=getattr(item, "group_id", None),
             duplicate_count=len(duplicates) if duplicates else 0,
             duplicates=duplicates or [],
