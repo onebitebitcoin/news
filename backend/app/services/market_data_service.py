@@ -76,7 +76,8 @@ async def fetch_mempool_fees() -> dict:
             "https://mempool.space/api/v1/fees/precise"
         )
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+        return {k: round(v, 1) for k, v in data.items()}
 
 
 async def fetch_fear_greed_index() -> dict:
