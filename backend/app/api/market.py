@@ -73,6 +73,10 @@ async def get_market_history(
                 kimchi_premium=snap.kimchi_premium,
                 fee_rates=fee_rates,
                 fear_greed_index=fear_greed,
+                difficulty_adjustment=snap.difficulty_adjustment,
+                hashrate=snap.hashrate_data,
+                mempool_stats=snap.mempool_stats,
+                halving=None,
             )
         )
 
@@ -90,6 +94,10 @@ async def get_market_history(
         kimchi_premium=current.get("kimchi_premium"),
         fee_rates=current.get("fee_rates"),
         fear_greed_index=fng_data,
+        difficulty_adjustment=current.get("difficulty_adjustment"),
+        hashrate=current.get("hashrate"),
+        mempool_stats=current.get("mempool_stats"),
+        halving=current.get("halving"),
     )
     result.append(today_entry)
 

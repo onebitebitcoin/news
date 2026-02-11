@@ -83,6 +83,83 @@ async def fetch_mempool_fees() -> dict:
         return {k: round(v, 1) for k, v in data.items()}
 
 
+async def fetch_difficulty_adjustment() -> dict:
+    """mempool.space 난이도 조정 데이터"""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        resp = await client.get(
+            "https://mempool.space/api/v1/difficulty-adjustment"
+        )
+        resp.raise_for_status()
+        d = resp.json()
+        return {
+            "progress_percent": round(d["progressPercent"], 2),
+            "difficulty_change": round(d["difficultyChange"], 2),
+            "estimated_retarget_date": d["estimatedRetargetDate"],
+            "remaining_blocks": d["remainingBlocks"],
+            "remaining_time": d["remainingTime"],
+            "previous_retarget": round(d["previousRetarget"], 2),
+            "next_retarget_height": d["nextRetargetHeight"],
+            "time_avg": d["timeAvg"],
+        }
+
+
+async def fetch_hashrate() -> dict:
+    """mempool.space 해시레이트"""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        resp = await client.get(
+            "https://mempool.space/api/v1/mining/hashrate/1w"
+        )
+        resp.raise_for_status()
+        d = resp.json()
+        return {
+            "current_hashrate": d["currentHashrate"],
+            "current_difficulty": d["currentDifficulty"],
+        }
+
+
+async def fetch_mempool_stats() -> dict:
+    """mempool.space 멤풀 통계"""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        resp = await client.get("https://mempool.space/api/mempool")
+        resp.raise_for_status()
+        d = resp.json()
+        return {
+            "count": d["count"],
+            "vsize": d["vsize"],
+            "total_fee": d["total_fee"],
+        }
+
+
+async def fetch_block_tip_height() -> int:
+    """현재 블록 높이"""
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        resp = await client.get(
+            "https://mempool.space/api/blocks/tip/height"
+        )
+        resp.raise_for_status()
+        return int(resp.text.strip())
+
+
+def calculate_halving_info(block_height: int) -> dict:
+    """반감기 카운트다운 계산"""
+    HALVING_INTERVAL = 210_000
+    current_era = block_height // HALVING_INTERVAL
+    next_halving_height = (current_era + 1) * HALVING_INTERVAL
+    remaining_blocks = next_halving_height - block_height
+    remaining_seconds = remaining_blocks * 10 * 60
+    progress = round(
+        ((block_height % HALVING_INTERVAL) / HALVING_INTERVAL) * 100, 2
+    )
+    return {
+        "current_block_height": block_height,
+        "next_halving_height": next_halving_height,
+        "remaining_blocks": remaining_blocks,
+        "remaining_time": remaining_seconds,
+        "progress_percent": progress,
+        "current_era": current_era,
+    }
+
+
 async def fetch_fear_greed_index() -> dict:
     """Fear & Greed 지수 조회"""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
@@ -160,6 +237,39 @@ async def update_market_data() -> None:
         logger.error(f"[MarketData] Fear & Greed fetch failed: {e}")
         market_data_state.add_error("fear_greed", str(e))
 
+    # 난이도 조정
+    try:
+        diff = await fetch_difficulty_adjustment()
+        market_data_state.update("difficulty_adjustment", diff)
+    except Exception as e:
+        logger.error(f"[MarketData] Difficulty adjustment fetch failed: {e}")
+        market_data_state.add_error("difficulty_adjustment", str(e))
+
+    # 해시레이트
+    try:
+        hr = await fetch_hashrate()
+        market_data_state.update("hashrate", hr)
+    except Exception as e:
+        logger.error(f"[MarketData] Hashrate fetch failed: {e}")
+        market_data_state.add_error("hashrate", str(e))
+
+    # 멤풀 통계
+    try:
+        mp = await fetch_mempool_stats()
+        market_data_state.update("mempool_stats", mp)
+    except Exception as e:
+        logger.error(f"[MarketData] Mempool stats fetch failed: {e}")
+        market_data_state.add_error("mempool_stats", str(e))
+
+    # 블록 높이 + 반감기 계산
+    try:
+        block_height = await fetch_block_tip_height()
+        halving = calculate_halving_info(block_height)
+        market_data_state.update("halving", halving)
+    except Exception as e:
+        logger.error(f"[MarketData] Block height fetch failed: {e}")
+        market_data_state.add_error("block_height", str(e))
+
     market_data_state.set_updated_at()
     logger.info("[MarketData] Market data update completed")
 
@@ -190,6 +300,7 @@ def save_daily_snapshot(data: dict) -> None:
         btc_krw_data = data.get("bitcoin_price_krw")
         btc_usd_data = data.get("bitcoin_price_usd")
         fng_data = data.get("fear_greed_index")
+        halving_data = data.get("halving")
 
         snapshot = MarketDataSnapshot(
             date=today_kst,
@@ -200,6 +311,10 @@ def save_daily_snapshot(data: dict) -> None:
             fee_rates=data.get("fee_rates"),
             fear_greed_value=fng_data["value"] if fng_data else None,
             fear_greed_classification=fng_data["classification"] if fng_data else None,
+            difficulty_adjustment=data.get("difficulty_adjustment"),
+            hashrate_data=data.get("hashrate"),
+            mempool_stats=data.get("mempool_stats"),
+            block_height=halving_data["current_block_height"] if halving_data else None,
         )
         db.add(snapshot)
         db.commit()

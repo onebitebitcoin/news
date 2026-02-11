@@ -46,3 +46,32 @@ def init_db():
 
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created")
+    migrate_market_snapshots()
+
+
+def migrate_market_snapshots():
+    """market_data_snapshots 테이블에 새 컬럼 추가 (없으면)"""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    if "market_data_snapshots" not in inspector.get_table_names():
+        return
+
+    existing = {col["name"] for col in inspector.get_columns("market_data_snapshots")}
+    new_columns = [
+        ("difficulty_adjustment", "TEXT"),
+        ("hashrate_data", "TEXT"),
+        ("mempool_stats", "TEXT"),
+        ("block_height", "INTEGER"),
+    ]
+
+    with engine.connect() as conn:
+        for col_name, col_type in new_columns:
+            if col_name not in existing:
+                conn.execute(
+                    text(
+                        f"ALTER TABLE market_data_snapshots ADD COLUMN {col_name} {col_type}"
+                    )
+                )
+                logger.info(f"Added column {col_name} to market_data_snapshots")
+        conn.commit()

@@ -26,6 +26,10 @@ class MarketDataState:
             "kimchi_premium": None,
             "fee_rates": None,
             "fear_greed_index": None,
+            "difficulty_adjustment": None,
+            "hashrate": None,
+            "mempool_stats": None,
+            "halving": None,
             "updated_at": None,
             "errors": {},
         }

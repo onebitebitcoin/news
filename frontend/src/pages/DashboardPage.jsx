@@ -5,6 +5,7 @@ import PriceCard from '../components/dashboard/PriceCard'
 import KimchiPremiumCard from '../components/dashboard/KimchiPremiumCard'
 import FearGreedCard from '../components/dashboard/FearGreedCard'
 import FeeRatesCard from '../components/dashboard/FeeRatesCard'
+import NetworkStatsCard from '../components/dashboard/NetworkStatsCard'
 import DashboardSkeleton from '../components/dashboard/DashboardSkeleton'
 
 function formatUpdatedAt(isoString) {
@@ -58,6 +59,12 @@ export default function DashboardPage() {
           />
           <FearGreedCard fearGreed={data?.fear_greed_index} />
           <FeeRatesCard feeRates={data?.fee_rates} />
+          <NetworkStatsCard
+            difficulty={data?.difficulty_adjustment}
+            hashrate={data?.hashrate}
+            mempool={data?.mempool_stats}
+            halving={data?.halving}
+          />
         </div>
       )}
     </div>

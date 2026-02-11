@@ -35,6 +35,41 @@ class FearGreedIndex(BaseModel):
     classification: str
 
 
+class DifficultyAdjustment(BaseModel):
+    """난이도 조정 데이터"""
+    progress_percent: float
+    difficulty_change: float
+    estimated_retarget_date: int
+    remaining_blocks: int
+    remaining_time: int
+    previous_retarget: float
+    next_retarget_height: int
+    time_avg: int
+
+
+class HashRate(BaseModel):
+    """해시레이트 데이터"""
+    current_hashrate: float
+    current_difficulty: float
+
+
+class MempoolStats(BaseModel):
+    """멤풀 통계"""
+    count: int
+    vsize: int
+    total_fee: int
+
+
+class HalvingInfo(BaseModel):
+    """반감기 카운트다운"""
+    current_block_height: int
+    next_halving_height: int
+    remaining_blocks: int
+    remaining_time: int
+    progress_percent: float
+    current_era: int
+
+
 class MarketDataResponse(BaseModel):
     """시장 데이터 전체 응답 (모든 필드 Optional - 부분 실패 허용)"""
     bitcoin_price_krw: Optional[BitcoinPriceKRW] = None
@@ -43,6 +78,10 @@ class MarketDataResponse(BaseModel):
     kimchi_premium: Optional[float] = None
     fee_rates: Optional[FeeRates] = None
     fear_greed_index: Optional[FearGreedIndex] = None
+    difficulty_adjustment: Optional[DifficultyAdjustment] = None
+    hashrate: Optional[HashRate] = None
+    mempool_stats: Optional[MempoolStats] = None
+    halving: Optional[HalvingInfo] = None
     updated_at: Optional[str] = None
     errors: Optional[dict[str, Any]] = None
 
@@ -56,6 +95,10 @@ class MarketDataDaily(BaseModel):
     kimchi_premium: Optional[float] = None
     fee_rates: Optional[FeeRates] = None
     fear_greed_index: Optional[FearGreedIndex] = None
+    difficulty_adjustment: Optional[DifficultyAdjustment] = None
+    hashrate: Optional[HashRate] = None
+    mempool_stats: Optional[MempoolStats] = None
+    halving: Optional[HalvingInfo] = None
 
 
 class MarketHistoryResponse(BaseModel):
