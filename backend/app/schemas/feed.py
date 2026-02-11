@@ -55,3 +55,4 @@ class FeedListResponse(BaseModel):
     page: int
     page_size: int
     has_next: bool
+    last_updated_at: Optional[datetime] = None

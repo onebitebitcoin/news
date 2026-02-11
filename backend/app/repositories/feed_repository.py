@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import desc, func, or_, select
@@ -129,6 +130,20 @@ class FeedRepository:
         self.db.commit()
         logger.debug(f"Bulk created {count} feed items")
         return count
+
+    def get_latest_published_at(
+        self,
+        category: Optional[str] = None,
+        source: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> Optional[datetime]:
+        """필터 조건에 맞는 최신 published_at 조회"""
+        query = self._apply_filters(
+            self.db.query(func.max(FeedItem.published_at)),
+            category, source, search,
+        )
+        result = query.scalar()
+        return result
 
     def get_grouped_feed(
         self,

@@ -9,6 +9,7 @@ export function useFeed(options = {}) {
   const [hasNext, setHasNext] = useState(false)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null)
 
   const fetchFeed = useCallback(async (pageNum = 1, append = false) => {
     try {
@@ -26,6 +27,7 @@ export function useFeed(options = {}) {
       setHasNext(data.has_next)
       setTotal(data.total)
       setPage(pageNum)
+      if (data.last_updated_at) setLastUpdatedAt(data.last_updated_at)
     } catch (err) {
       setError(extractApiError(err))
     } finally {
@@ -74,6 +76,7 @@ export function useFeed(options = {}) {
     hasNext,
     total,
     page,
+    lastUpdatedAt,
     loadMore,
     refresh,
     toggleBookmark,

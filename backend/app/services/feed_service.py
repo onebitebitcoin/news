@@ -47,6 +47,11 @@ class FeedService:
             search=search,
         )
 
+        # 최신 발행 시간 조회
+        last_updated_at = self.feed_repo.get_latest_published_at(
+            category=category, source=source, search=search,
+        )
+
         # 북마크 상태 확인
         bookmarked_ids = self.bookmark_repo.get_item_ids()
 
@@ -61,6 +66,7 @@ class FeedService:
             page=page,
             page_size=page_size,
             has_next=(page * page_size) < total,
+            last_updated_at=last_updated_at,
         )
 
     def get_feed_detail(self, item_id: str) -> Optional[FeedItemDetail]:

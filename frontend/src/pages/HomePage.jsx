@@ -28,16 +28,18 @@ export default function HomePage() {
     loadMore,
     refresh,
     toggleBookmark,
+    lastUpdatedAt,
   } = useFeed({ category, search, source })
 
   const { status: schedulerStatus, refresh: refreshScheduler } = useSchedulerStatus()
   const { progress: fetchProgress, loading: progressLoading, refresh: refreshProgress } = useFetchProgress()
 
-  // 마지막 수집 시간 (상대 시간)
-  const lastFetchText = useMemo(() => {
-    if (!schedulerStatus?.last_fetch_at) return null
-    return getTimeAgo(schedulerStatus.last_fetch_at)
-  }, [schedulerStatus?.last_fetch_at])
+  // 최신 기사 시간 (피드 API 기반) 또는 마지막 수집 시간 (스케줄러 기반) fallback
+  const lastUpdateText = useMemo(() => {
+    if (lastUpdatedAt) return `최신 기사: ${getTimeAgo(lastUpdatedAt)}`
+    if (schedulerStatus?.last_fetch_at) return `마지막 수집: ${getTimeAgo(schedulerStatus.last_fetch_at)}`
+    return null
+  }, [lastUpdatedAt, schedulerStatus?.last_fetch_at])
 
   // 수집 중 여부
   const isFetching = fetchProgress?.status === 'running'
@@ -138,9 +140,9 @@ export default function HomePage() {
                 </span>
               )}
             </span>
-          ) : lastFetchText ? (
+          ) : lastUpdateText ? (
             <span className="text-sm text-zinc-500">
-              마지막 수집: {lastFetchText}
+              {lastUpdateText}
             </span>
           ) : null}
         </div>
