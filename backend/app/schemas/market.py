@@ -21,12 +21,12 @@ class BitcoinPriceUSD(BaseModel):
 
 
 class FeeRates(BaseModel):
-    """mempool 수수료율"""
-    fastestFee: int
-    halfHourFee: int
-    hourFee: int
-    economyFee: int
-    minimumFee: Optional[int] = None
+    """mempool 수수료율 (소수점 3자리, sat/vB)"""
+    fastestFee: float
+    halfHourFee: float
+    hourFee: float
+    economyFee: float
+    minimumFee: Optional[float] = None
 
 
 class FearGreedIndex(BaseModel):

@@ -73,7 +73,7 @@ async def fetch_mempool_fees() -> dict:
     """mempool.space 수수료율 조회"""
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
         resp = await client.get(
-            "https://mempool.space/api/v1/fees/recommended"
+            "https://mempool.space/api/v1/fees/precise"
         )
         resp.raise_for_status()
         return resp.json()

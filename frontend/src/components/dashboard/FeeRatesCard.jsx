@@ -20,7 +20,7 @@ export default function FeeRatesCard({ feeRates }) {
           <div key={key} className="flex items-center justify-between">
             <span className="text-zinc-400 text-sm">{label}</span>
             <span className={`text-sm font-medium ${color}`}>
-              {feeRates?.[key] != null ? `${feeRates[key]} sat/vB` : '-'}
+              {feeRates?.[key] != null ? `${Number(feeRates[key]).toFixed(1)} sat/vB` : '-'}
             </span>
           </div>
         ))}
