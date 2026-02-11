@@ -1,25 +1,5 @@
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
-
-const formatKRW = (value) => {
-  if (!value) return '-'
-  return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW', maximumFractionDigits: 0 }).format(value)
-}
-
-const formatUSD = (value) => {
-  if (!value) return '-'
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value)
-}
-
-const formatPercent = (value) => {
-  if (value == null) return '-'
-  const pct = (value * 100).toFixed(2)
-  return value >= 0 ? `+${pct}%` : `${pct}%`
-}
-
-const formatVolume = (value) => {
-  if (!value) return '-'
-  return new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 2 }).format(value)
-}
+import { formatKRW, formatUSD, formatPercent, formatVolume } from '../../utils/formatUtils'
 
 export default function PriceCard({ krwData, usdData }) {
   const changeRate = krwData?.change_rate

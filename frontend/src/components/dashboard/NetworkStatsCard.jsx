@@ -1,22 +1,5 @@
 import { Activity, Cpu, Layers, Timer } from 'lucide-react'
-
-function formatHashrate(hashrate) {
-  if (hashrate == null) return '-'
-  const eh = hashrate / 1e18
-  return `${eh.toFixed(1)} EH/s`
-}
-
-function formatVsizeMB(vsize) {
-  if (vsize == null) return '-'
-  const mb = vsize / 1_000_000
-  return `${mb.toFixed(1)} MB`
-}
-
-function formatDaysFromSeconds(seconds) {
-  if (seconds == null) return '-'
-  const days = Math.floor(seconds / 86400)
-  return `${days.toLocaleString()}d`
-}
+import { formatHashrate, formatVsizeMB, formatDaysFromSeconds } from '../../utils/formatUtils'
 
 function ProgressBar({ percent, color = 'bg-blue-500' }) {
   return (

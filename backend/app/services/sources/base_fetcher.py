@@ -1,15 +1,15 @@
 """RSS Fetcher 기본 인터페이스"""
 
 import asyncio
-import hashlib
 import logging
 import re
 from abc import ABC
 from datetime import datetime, timedelta
 from typing import List, Optional
-from urllib.parse import parse_qs, urlencode, urlparse
 
 import feedparser
+
+from app.utils.url_utils import create_url_hash, normalize_url
 
 logger = logging.getLogger(__name__)
 
@@ -237,36 +237,12 @@ class BaseFetcher(ABC):
     @staticmethod
     def normalize_url(url: str) -> str:
         """URL 정규화 - 트래킹 파라미터 제거"""
-        tracking_params = {
-            "utm_source", "utm_medium", "utm_campaign", "utm_content",
-            "utm_term", "ref", "source", "fbclid", "gclid"
-        }
-
-        parsed = urlparse(url)
-        query_params = parse_qs(parsed.query)
-
-        # 트래킹 파라미터 제거
-        filtered_params = {
-            k: v for k, v in query_params.items()
-            if k.lower() not in tracking_params
-        }
-
-        # URL 재구성
-        if filtered_params:
-            new_query = urlencode(filtered_params, doseq=True)
-            normalized = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
-            if new_query:
-                normalized += f"?{new_query}"
-        else:
-            normalized = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
-
-        return normalized.rstrip("/")
+        return normalize_url(url)
 
     @staticmethod
     def create_url_hash(url: str) -> str:
         """URL의 SHA256 해시 생성"""
-        normalized = BaseFetcher.normalize_url(url)
-        return hashlib.sha256(normalized.encode()).hexdigest()[:16]
+        return create_url_hash(url)
 
     @staticmethod
     def parse_datetime(dt_string: str) -> Optional[datetime]:

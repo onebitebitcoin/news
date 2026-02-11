@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Key, Plus, Trash2, Copy, Check, RefreshCw, AlertTriangle } from 'lucide-react'
 import ErrorAlert from '../components/common/ErrorAlert'
 import { adminApi } from '../api/feed'
+import { extractApiError } from '../api/client'
 
 export default function ApiKeysPage() {
   const [keys, setKeys] = useState([])
@@ -20,7 +21,7 @@ export default function ApiKeysPage() {
       const data = await adminApi.getApiKeys()
       setKeys(data.keys)
     } catch (err) {
-      setError(err.response?.data?.detail?.message || 'API 키 목록을 불러오지 못했습니다.')
+      setError(extractApiError(err).message || 'API 키 목록을 불러오지 못했습니다.')
     } finally {
       setLoading(false)
     }
@@ -42,7 +43,7 @@ export default function ApiKeysPage() {
       setNewKeyName('')
       await fetchKeys()
     } catch (err) {
-      setError(err.response?.data?.detail?.message || 'API 키 생성에 실패했습니다.')
+      setError(extractApiError(err).message || 'API 키 생성에 실패했습니다.')
     } finally {
       setCreating(false)
     }
@@ -56,7 +57,7 @@ export default function ApiKeysPage() {
       if (createdKey?.id === keyId) setCreatedKey(null)
       await fetchKeys()
     } catch (err) {
-      setError(err.response?.data?.detail?.message || 'API 키 삭제에 실패했습니다.')
+      setError(extractApiError(err).message || 'API 키 삭제에 실패했습니다.')
     }
   }
 

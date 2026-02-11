@@ -1,4 +1,5 @@
 import { ArrowUpDown } from 'lucide-react'
+import { formatRate } from '../../utils/formatUtils'
 
 function getPremiumColor(value) {
   if (value == null) return 'text-zinc-400'
@@ -14,11 +15,6 @@ function getPremiumLabel(value) {
   if (value >= 3) return 'Moderate'
   if (value >= 0) return 'Normal'
   return 'Discount'
-}
-
-const formatRate = (value) => {
-  if (!value) return '-'
-  return new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 }).format(value)
 }
 
 export default function KimchiPremiumCard({ premium, usdKrwRate }) {

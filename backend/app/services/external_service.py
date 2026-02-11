@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import List, Optional, Tuple
 
@@ -7,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.feed_item import FeedItem
 from app.repositories.feed_repository import FeedRepository
 from app.schemas.external import ExternalArticle, ExternalArticleDetail
+from app.utils.json_utils import safe_parse_json
 
 logger = logging.getLogger(__name__)
 
@@ -66,12 +66,7 @@ class ExternalService:
 
     def _to_article_detail(self, item: FeedItem) -> ExternalArticleDetail:
         """FeedItem → ExternalArticleDetail 변환"""
-        tags = None
-        if item.tags:
-            try:
-                tags = json.loads(item.tags)
-            except json.JSONDecodeError:
-                tags = None
+        tags = safe_parse_json(item.tags, default=None) if item.tags else None
 
         return ExternalArticleDetail(
             id=item.id,

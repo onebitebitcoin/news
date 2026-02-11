@@ -1,4 +1,3 @@
-import json
 import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
@@ -8,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.repositories.bookmark_repository import BookmarkRepository
 from app.repositories.feed_repository import FeedRepository
 from app.schemas.feed import FeedItemDetail, FeedItemDuplicate, FeedItemResponse, FeedListResponse
+from app.utils.json_utils import safe_parse_json
 
 logger = logging.getLogger(__name__)
 
@@ -78,12 +78,7 @@ class FeedService:
         is_bookmarked = self.bookmark_repo.exists(item_id)
 
         # tags JSON 파싱
-        tags = None
-        if item.tags:
-            try:
-                tags = json.loads(item.tags)
-            except json.JSONDecodeError:
-                tags = []
+        tags = safe_parse_json(item.tags, default=[]) if item.tags else None
 
         return FeedItemDetail(
             id=item.id,

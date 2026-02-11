@@ -1,7 +1,7 @@
 """시장 데이터 API 라우터"""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -14,10 +14,9 @@ from app.schemas.market import (
     MarketDataResponse,
     MarketHistoryResponse,
 )
+from app.utils.timezone import KST
 
 logger = logging.getLogger(__name__)
-
-KST = timezone(timedelta(hours=9))
 
 router = APIRouter(
     prefix="/market",

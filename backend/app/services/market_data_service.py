@@ -1,143 +1,136 @@
 """시장 데이터 외부 API 호출 + 캐시 갱신 서비스"""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
+from typing import Any, Callable, Coroutine
 
 import httpx
 
 from app.database import SessionLocal
 from app.market_data_state import market_data_state
 from app.models.market_data_snapshot import MarketDataSnapshot
+from app.utils.timezone import KST
 
 logger = logging.getLogger(__name__)
 
 _TIMEOUT = 10.0
 
 
-async def fetch_upbit_btc_price() -> dict:
+async def fetch_upbit_btc_price(client: httpx.AsyncClient) -> dict:
     """업비트 BTC/KRW 가격 조회"""
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.get(
-            "https://api.upbit.com/v1/ticker",
-            params={"markets": "KRW-BTC"},
-        )
-        resp.raise_for_status()
-        data = resp.json()[0]
-        return {
-            "price": data["trade_price"],
-            "change_rate": data.get("signed_change_rate", 0),
-            "high_price": data.get("high_price"),
-            "low_price": data.get("low_price"),
-            "acc_trade_volume_24h": data.get("acc_trade_volume_24h"),
-            "change": data.get("change"),
-        }
+    resp = await client.get(
+        "https://api.upbit.com/v1/ticker",
+        params={"markets": "KRW-BTC"},
+    )
+    resp.raise_for_status()
+    data = resp.json()[0]
+    return {
+        "price": data["trade_price"],
+        "change_rate": data.get("signed_change_rate", 0),
+        "high_price": data.get("high_price"),
+        "low_price": data.get("low_price"),
+        "acc_trade_volume_24h": data.get("acc_trade_volume_24h"),
+        "change": data.get("change"),
+    }
 
 
-async def fetch_usd_krw_rate() -> float:
+async def fetch_usd_krw_rate(client: httpx.AsyncClient) -> float:
     """USD/KRW 실제 환율 조회 (Primary: ExchangeRate-API, Fallback: Frankfurter)"""
     # Primary: ExchangeRate-API
     try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            resp = await client.get("https://open.er-api.com/v6/latest/USD")
-            resp.raise_for_status()
-            data = resp.json()
-            rate = data["rates"]["KRW"]
-            logger.info(f"[MarketData] USD/KRW rate from ExchangeRate-API: {rate}")
-            return float(rate)
+        resp = await client.get("https://open.er-api.com/v6/latest/USD")
+        resp.raise_for_status()
+        data = resp.json()
+        rate = data["rates"]["KRW"]
+        logger.info(f"[MarketData] USD/KRW rate from ExchangeRate-API: {rate}")
+        return float(rate)
     except Exception as e:
         logger.warning(f"[MarketData] ExchangeRate-API failed, trying fallback: {e}")
 
     # Fallback: Frankfurter
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.get(
-            "https://api.frankfurter.app/latest",
-            params={"from": "USD", "to": "KRW"},
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        rate = data["rates"]["KRW"]
-        logger.info(f"[MarketData] USD/KRW rate from Frankfurter: {rate}")
-        return float(rate)
+    resp = await client.get(
+        "https://api.frankfurter.app/latest",
+        params={"from": "USD", "to": "KRW"},
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    rate = data["rates"]["KRW"]
+    logger.info(f"[MarketData] USD/KRW rate from Frankfurter: {rate}")
+    return float(rate)
 
 
-async def fetch_btc_usd_price() -> float:
+async def fetch_btc_usd_price(client: httpx.AsyncClient) -> float:
     """Kraken BTC/USD 가격 조회"""
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.get(
-            "https://api.kraken.com/0/public/Ticker",
-            params={"pair": "XBTUSD"},
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return float(data["result"]["XXBTZUSD"]["c"][0])
+    resp = await client.get(
+        "https://api.kraken.com/0/public/Ticker",
+        params={"pair": "XBTUSD"},
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return float(data["result"]["XXBTZUSD"]["c"][0])
 
 
-async def fetch_mempool_fees() -> dict:
+async def fetch_mempool_fees(client: httpx.AsyncClient) -> dict:
     """mempool.space 수수료율 조회"""
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.get(
-            "https://mempool.space/api/v1/fees/precise"
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return {k: round(v, 1) for k, v in data.items()}
+    resp = await client.get(
+        "https://mempool.space/api/v1/fees/precise"
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return {k: round(v, 1) for k, v in data.items()}
 
 
-async def fetch_difficulty_adjustment() -> dict:
+async def fetch_difficulty_adjustment(client: httpx.AsyncClient) -> dict:
     """mempool.space 난이도 조정 데이터"""
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.get(
-            "https://mempool.space/api/v1/difficulty-adjustment"
-        )
-        resp.raise_for_status()
-        d = resp.json()
-        return {
-            "progress_percent": round(d["progressPercent"], 2),
-            "difficulty_change": round(d["difficultyChange"], 2),
-            "estimated_retarget_date": d["estimatedRetargetDate"],
-            "remaining_blocks": d["remainingBlocks"],
-            "remaining_time": d["remainingTime"],
-            "previous_retarget": round(d["previousRetarget"], 2),
-            "next_retarget_height": d["nextRetargetHeight"],
-            "time_avg": d["timeAvg"],
-        }
+    resp = await client.get(
+        "https://mempool.space/api/v1/difficulty-adjustment"
+    )
+    resp.raise_for_status()
+    d = resp.json()
+    return {
+        "progress_percent": round(d["progressPercent"], 2),
+        "difficulty_change": round(d["difficultyChange"], 2),
+        "estimated_retarget_date": d["estimatedRetargetDate"],
+        "remaining_blocks": d["remainingBlocks"],
+        "remaining_time": d["remainingTime"],
+        "previous_retarget": round(d["previousRetarget"], 2),
+        "next_retarget_height": d["nextRetargetHeight"],
+        "time_avg": d["timeAvg"],
+    }
 
 
-async def fetch_hashrate() -> dict:
+async def fetch_hashrate(client: httpx.AsyncClient) -> dict:
     """mempool.space 해시레이트"""
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.get(
-            "https://mempool.space/api/v1/mining/hashrate/1w"
-        )
-        resp.raise_for_status()
-        d = resp.json()
-        return {
-            "current_hashrate": d["currentHashrate"],
-            "current_difficulty": d["currentDifficulty"],
-        }
+    resp = await client.get(
+        "https://mempool.space/api/v1/mining/hashrate/1w"
+    )
+    resp.raise_for_status()
+    d = resp.json()
+    return {
+        "current_hashrate": d["currentHashrate"],
+        "current_difficulty": d["currentDifficulty"],
+    }
 
 
-async def fetch_mempool_stats() -> dict:
+async def fetch_mempool_stats(client: httpx.AsyncClient) -> dict:
     """mempool.space 멤풀 통계"""
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.get("https://mempool.space/api/mempool")
-        resp.raise_for_status()
-        d = resp.json()
-        return {
-            "count": d["count"],
-            "vsize": d["vsize"],
-            "total_fee": d["total_fee"],
-        }
+    resp = await client.get("https://mempool.space/api/mempool")
+    resp.raise_for_status()
+    d = resp.json()
+    return {
+        "count": d["count"],
+        "vsize": d["vsize"],
+        "total_fee": d["total_fee"],
+    }
 
 
-async def fetch_block_tip_height() -> int:
+async def fetch_block_tip_height(client: httpx.AsyncClient) -> int:
     """현재 블록 높이"""
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.get(
-            "https://mempool.space/api/blocks/tip/height"
-        )
-        resp.raise_for_status()
-        return int(resp.text.strip())
+    resp = await client.get(
+        "https://mempool.space/api/blocks/tip/height"
+    )
+    resp.raise_for_status()
+    return int(resp.text.strip())
 
 
 def calculate_halving_info(block_height: int) -> dict:
@@ -160,16 +153,15 @@ def calculate_halving_info(block_height: int) -> dict:
     }
 
 
-async def fetch_fear_greed_index() -> dict:
+async def fetch_fear_greed_index(client: httpx.AsyncClient) -> dict:
     """Fear & Greed 지수 조회"""
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        resp = await client.get("https://api.alternative.me/fng/")
-        resp.raise_for_status()
-        data = resp.json()["data"][0]
-        return {
-            "value": int(data["value"]),
-            "classification": data["value_classification"],
-        }
+    resp = await client.get("https://api.alternative.me/fng/")
+    resp.raise_for_status()
+    data = resp.json()["data"][0]
+    return {
+        "value": int(data["value"]),
+        "classification": data["value_classification"],
+    }
 
 
 def calculate_kimchi_premium(
@@ -182,93 +174,77 @@ def calculate_kimchi_premium(
     return round(((upbit_krw / binance_krw) - 1) * 100, 2)
 
 
+async def _safe_fetch(
+    fetcher: Callable[..., Coroutine[Any, Any, Any]],
+    state_key: str,
+    error_key: str,
+    label: str,
+    client: httpx.AsyncClient,
+) -> Any:
+    """공통 fetch-update-error 패턴"""
+    try:
+        result = await fetcher(client)
+        market_data_state.update(state_key, result)
+        return result
+    except Exception as e:
+        logger.error(f"[MarketData] {label} fetch failed: {e}")
+        market_data_state.add_error(error_key, str(e))
+        return None
+
+
 async def update_market_data() -> None:
     """전체 시장 데이터 갱신 (스케줄러에서 호출)"""
     logger.info("[MarketData] Updating market data...")
     market_data_state.clear_errors()
 
-    # 업비트 BTC/KRW
-    try:
-        btc_krw = await fetch_upbit_btc_price()
-        market_data_state.update("bitcoin_price_krw", btc_krw)
-    except Exception as e:
-        logger.error(f"[MarketData] Upbit BTC fetch failed: {e}")
-        market_data_state.add_error("upbit_btc", str(e))
-
-    # USD/KRW 실제 환율
-    usd_krw = None
-    try:
-        usd_krw = await fetch_usd_krw_rate()
-        market_data_state.update("usd_krw_rate", usd_krw)
-    except Exception as e:
-        logger.error(f"[MarketData] USD/KRW rate fetch failed: {e}")
-        market_data_state.add_error("usd_krw", str(e))
-
-    # CoinGecko BTC/USD
-    btc_usd = None
-    try:
-        btc_usd = await fetch_btc_usd_price()
-        market_data_state.update("bitcoin_price_usd", {"price": btc_usd})
-    except Exception as e:
-        logger.error(f"[MarketData] Kraken BTC fetch failed: {e}")
-        market_data_state.add_error("kraken_btc", str(e))
-
-    # 김치 프리미엄 계산
-    btc_krw_data = market_data_state.get_all().get("bitcoin_price_krw")
-    if btc_krw_data and btc_usd and usd_krw:
-        premium = calculate_kimchi_premium(
-            btc_krw_data["price"], btc_usd, usd_krw
+    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        await _safe_fetch(
+            fetch_upbit_btc_price, "bitcoin_price_krw", "upbit_btc", "Upbit BTC", client
         )
-        market_data_state.update("kimchi_premium", premium)
 
-    # mempool 수수료
-    try:
-        fees = await fetch_mempool_fees()
-        market_data_state.update("fee_rates", fees)
-    except Exception as e:
-        logger.error(f"[MarketData] Mempool fees fetch failed: {e}")
-        market_data_state.add_error("mempool", str(e))
+        usd_krw = await _safe_fetch(
+            fetch_usd_krw_rate, "usd_krw_rate", "usd_krw", "USD/KRW rate", client
+        )
 
-    # Fear & Greed 지수
-    try:
-        fng = await fetch_fear_greed_index()
-        market_data_state.update("fear_greed_index", fng)
-    except Exception as e:
-        logger.error(f"[MarketData] Fear & Greed fetch failed: {e}")
-        market_data_state.add_error("fear_greed", str(e))
+        btc_usd = await _safe_fetch(
+            fetch_btc_usd_price, "bitcoin_price_usd", "kraken_btc", "Kraken BTC", client
+        )
+        # btc_usd는 float이지만 state에는 {"price": value}로 저장
+        if btc_usd is not None:
+            market_data_state.update("bitcoin_price_usd", {"price": btc_usd})
 
-    # 난이도 조정
-    try:
-        diff = await fetch_difficulty_adjustment()
-        market_data_state.update("difficulty_adjustment", diff)
-    except Exception as e:
-        logger.error(f"[MarketData] Difficulty adjustment fetch failed: {e}")
-        market_data_state.add_error("difficulty_adjustment", str(e))
+        # 김치 프리미엄 계산
+        btc_krw_data = market_data_state.get_all().get("bitcoin_price_krw")
+        if btc_krw_data and btc_usd and usd_krw:
+            premium = calculate_kimchi_premium(
+                btc_krw_data["price"], btc_usd, usd_krw
+            )
+            market_data_state.update("kimchi_premium", premium)
 
-    # 해시레이트
-    try:
-        hr = await fetch_hashrate()
-        market_data_state.update("hashrate", hr)
-    except Exception as e:
-        logger.error(f"[MarketData] Hashrate fetch failed: {e}")
-        market_data_state.add_error("hashrate", str(e))
+        await _safe_fetch(
+            fetch_mempool_fees, "fee_rates", "mempool", "Mempool fees", client
+        )
+        await _safe_fetch(
+            fetch_fear_greed_index, "fear_greed_index", "fear_greed", "Fear & Greed", client
+        )
+        await _safe_fetch(
+            fetch_difficulty_adjustment, "difficulty_adjustment", "difficulty_adjustment",
+            "Difficulty adjustment", client
+        )
+        await _safe_fetch(
+            fetch_hashrate, "hashrate", "hashrate", "Hashrate", client
+        )
+        await _safe_fetch(
+            fetch_mempool_stats, "mempool_stats", "mempool_stats", "Mempool stats", client
+        )
 
-    # 멤풀 통계
-    try:
-        mp = await fetch_mempool_stats()
-        market_data_state.update("mempool_stats", mp)
-    except Exception as e:
-        logger.error(f"[MarketData] Mempool stats fetch failed: {e}")
-        market_data_state.add_error("mempool_stats", str(e))
-
-    # 블록 높이 + 반감기 계산
-    try:
-        block_height = await fetch_block_tip_height()
-        halving = calculate_halving_info(block_height)
-        market_data_state.update("halving", halving)
-    except Exception as e:
-        logger.error(f"[MarketData] Block height fetch failed: {e}")
-        market_data_state.add_error("block_height", str(e))
+        # 블록 높이 + 반감기 계산
+        block_height = await _safe_fetch(
+            fetch_block_tip_height, "block_height", "block_height", "Block height", client
+        )
+        if block_height is not None:
+            halving = calculate_halving_info(block_height)
+            market_data_state.update("halving", halving)
 
     market_data_state.set_updated_at()
     logger.info("[MarketData] Market data update completed")
@@ -278,9 +254,6 @@ async def update_market_data() -> None:
         save_daily_snapshot(market_data_state.get_all())
     except Exception as e:
         logger.error(f"[MarketData] Daily snapshot save failed: {e}")
-
-
-KST = timezone(timedelta(hours=9))
 
 
 def save_daily_snapshot(data: dict) -> None:
