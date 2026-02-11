@@ -2,7 +2,7 @@
 
 from typing import Any, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class BitcoinPriceKRW(BaseModel):
@@ -45,3 +45,20 @@ class MarketDataResponse(BaseModel):
     fear_greed_index: Optional[FearGreedIndex] = None
     updated_at: Optional[str] = None
     errors: Optional[dict[str, Any]] = None
+
+
+class MarketDataDaily(BaseModel):
+    """일별 시장 데이터"""
+    date: str
+    bitcoin_price_krw: Optional[float] = None
+    bitcoin_price_usd: Optional[float] = None
+    usd_krw_rate: Optional[float] = None
+    kimchi_premium: Optional[float] = None
+    fee_rates: Optional[FeeRates] = None
+    fear_greed_index: Optional[FearGreedIndex] = None
+
+
+class MarketHistoryResponse(BaseModel):
+    """시장 데이터 히스토리 응답"""
+    days: int = Field(description="조회 일수")
+    data: list[MarketDataDaily]

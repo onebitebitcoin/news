@@ -1,10 +1,13 @@
 """시장 데이터 외부 API 호출 + 캐시 갱신 서비스"""
 
 import logging
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
+from app.database import SessionLocal
 from app.market_data_state import market_data_state
+from app.models.market_data_snapshot import MarketDataSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -159,3 +162,47 @@ async def update_market_data() -> None:
 
     market_data_state.set_updated_at()
     logger.info("[MarketData] Market data update completed")
+
+    # 일별 스냅샷 저장
+    try:
+        save_daily_snapshot(market_data_state.get_all())
+    except Exception as e:
+        logger.error(f"[MarketData] Daily snapshot save failed: {e}")
+
+
+KST = timezone(timedelta(hours=9))
+
+
+def save_daily_snapshot(data: dict) -> None:
+    """KST 기준 오늘 날짜의 스냅샷이 없으면 저장"""
+    today_kst = datetime.now(KST).date()
+
+    db = SessionLocal()
+    try:
+        existing = (
+            db.query(MarketDataSnapshot)
+            .filter(MarketDataSnapshot.date == today_kst)
+            .first()
+        )
+        if existing:
+            return
+
+        btc_krw_data = data.get("bitcoin_price_krw")
+        btc_usd_data = data.get("bitcoin_price_usd")
+        fng_data = data.get("fear_greed_index")
+
+        snapshot = MarketDataSnapshot(
+            date=today_kst,
+            bitcoin_price_krw=btc_krw_data["price"] if btc_krw_data else None,
+            bitcoin_price_usd=btc_usd_data["price"] if btc_usd_data else None,
+            usd_krw_rate=data.get("usd_krw_rate"),
+            kimchi_premium=data.get("kimchi_premium"),
+            fee_rates=data.get("fee_rates"),
+            fear_greed_value=fng_data["value"] if fng_data else None,
+            fear_greed_classification=fng_data["classification"] if fng_data else None,
+        )
+        db.add(snapshot)
+        db.commit()
+        logger.info(f"[MarketData] Daily snapshot saved for {today_kst}")
+    finally:
+        db.close()
