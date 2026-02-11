@@ -22,7 +22,7 @@ export default function BookmarksPage() {
       </div>
 
       {/* Error */}
-      <ErrorAlert message={error} />
+      <ErrorAlert message={error} onRetry={refresh} />
 
       {/* Loading */}
       {loading && items.length === 0 && (

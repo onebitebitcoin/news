@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { feedApi, bookmarkApi } from '../api/feed'
+import { extractApiError } from '../api/client'
 
 export function useFeed(options = {}) {
   const [items, setItems] = useState([])
@@ -26,7 +27,7 @@ export function useFeed(options = {}) {
       setTotal(data.total)
       setPage(pageNum)
     } catch (err) {
-      setError(err.message || 'Failed to fetch feed')
+      setError(extractApiError(err))
     } finally {
       setLoading(false)
     }
@@ -132,7 +133,7 @@ export function useBookmarks() {
       const data = await bookmarkApi.getList()
       setItems(data.items || [])
     } catch (err) {
-      setError(err.message || 'Failed to fetch bookmarks')
+      setError(extractApiError(err))
     } finally {
       setLoading(false)
     }

@@ -173,7 +173,7 @@ export default function HomePage() {
       )}
 
       {/* Error */}
-      <ErrorAlert message={error} />
+      <ErrorAlert message={error} onRetry={refresh} />
 
       {/* Feed List */}
       <FeedList

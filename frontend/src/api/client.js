@@ -30,4 +30,61 @@ client.interceptors.response.use(
   }
 )
 
+/**
+ * Axios 에러에서 구조화된 에러 정보를 추출한다.
+ * @returns {{ message: string, status: number|null, detail: string|null, type: string|null }}
+ */
+export function extractApiError(err) {
+  // 서버 응답이 있는 경우
+  if (err.response) {
+    const { status, data } = err.response
+    const detail = data?.detail
+
+    // 백엔드가 구조화된 detail 객체를 반환한 경우
+    if (detail && typeof detail === 'object') {
+      return {
+        message: detail.message || `서버 오류 (${status})`,
+        status,
+        detail: detail.error || null,
+        type: detail.type || null,
+      }
+    }
+
+    // detail이 문자열인 경우
+    if (typeof detail === 'string') {
+      return {
+        message: detail,
+        status,
+        detail: null,
+        type: null,
+      }
+    }
+
+    return {
+      message: `서버 오류 (${status})`,
+      status,
+      detail: null,
+      type: null,
+    }
+  }
+
+  // 서버 응답 없음 (네트워크 에러)
+  if (err.request) {
+    return {
+      message: '서버에 연결할 수 없습니다',
+      status: null,
+      detail: err.message || null,
+      type: 'NetworkError',
+    }
+  }
+
+  // 기타 에러
+  return {
+    message: err.message || '알 수 없는 오류가 발생했습니다',
+    status: null,
+    detail: null,
+    type: null,
+  }
+}
+
 export default client
