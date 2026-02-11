@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
-import { CheckCircle2, RefreshCw, XCircle } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { CheckCircle2, Plus, RefreshCw, XCircle } from 'lucide-react'
 import ErrorAlert from '../components/common/ErrorAlert'
 import TrendingSection from '../components/feed/TrendingSection'
 import CategoryChips from '../components/filters/CategoryChips'
@@ -146,13 +147,21 @@ export default function HomePage() {
             </span>
           ) : null}
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={loading || manualRefreshing || isFetching}
-          className="p-2 rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-5 h-5 text-zinc-400 ${manualRefreshing ? 'animate-spin' : ''}`} />
-        </button>
+        <div className="flex items-center gap-1">
+          <Link
+            to="/articles/add"
+            className="p-2 rounded-lg hover:bg-zinc-800 transition-colors"
+          >
+            <Plus className="w-5 h-5 text-zinc-400" />
+          </Link>
+          <button
+            onClick={handleRefresh}
+            disabled={loading || manualRefreshing || isFetching}
+            className="p-2 rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-5 h-5 text-zinc-400 ${manualRefreshing ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {refreshNotice && (

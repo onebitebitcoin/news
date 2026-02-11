@@ -55,7 +55,9 @@ export default function FeedCard({ item, onBookmark }) {
                 NEW
               </span>
             )}
-            <span className="text-xs text-zinc-500">{item.source}</span>
+            <span className="text-xs text-zinc-500">
+              {item.source === 'manual' ? '수동 추가' : item.source}
+            </span>
           </div>
 
           {/* 제목 */}

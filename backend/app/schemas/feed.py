@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 
 
 class FeedItemDuplicate(BaseModel):
@@ -56,3 +56,24 @@ class FeedListResponse(BaseModel):
     page_size: int
     has_next: bool
     last_updated_at: Optional[datetime] = None
+
+
+class UrlPreviewRequest(BaseModel):
+    """URL 미리보기 요청"""
+    url: HttpUrl
+
+
+class UrlPreviewResponse(BaseModel):
+    """URL 미리보기 응답"""
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    image_url: Optional[str] = None
+    url: str
+
+
+class ManualArticleCreate(BaseModel):
+    """수동 기사 추가 요청"""
+    url: HttpUrl
+    title: str
+    summary: Optional[str] = None
+    image_url: Optional[str] = None

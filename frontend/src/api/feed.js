@@ -57,6 +57,18 @@ export const feedApi = {
     })
     return data
   },
+
+  // URL 미리보기
+  previewUrl: async (url) => {
+    const { data } = await client.post('/feed/preview', { url })
+    return data
+  },
+
+  // 수동 기사 추가
+  createManual: async ({ url, title, summary, image_url }) => {
+    const { data } = await client.post('/feed/manual', { url, title, summary, image_url })
+    return data
+  },
 }
 
 export const adminApi = {
