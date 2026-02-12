@@ -69,6 +69,7 @@ class UrlPreviewResponse(BaseModel):
     summary: Optional[str] = None
     image_url: Optional[str] = None
     url: str
+    published_at: Optional[datetime] = None
 
 
 class ManualArticleCreate(BaseModel):
@@ -77,6 +78,7 @@ class ManualArticleCreate(BaseModel):
     title: str
     summary: Optional[str] = None
     image_url: Optional[str] = None
+    published_at: Optional[datetime] = None
 
 
 class SearchArticlesRequest(BaseModel):

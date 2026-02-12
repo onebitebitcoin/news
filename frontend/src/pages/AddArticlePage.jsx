@@ -78,6 +78,7 @@ export default function AddArticlePage() {
         title: title.trim(),
         summary: summary.trim() || null,
         image_url: imageUrl.trim() || null,
+        published_at: preview?.published_at || null,
       })
       setSuccess('기사가 추가되었습니다')
       setTimeout(() => navigate('/'), 1500)
@@ -142,6 +143,7 @@ export default function AddArticlePage() {
           title: item.title,
           summary: item.summary || null,
           image_url: null,
+          published_at: item.published_at || null,
         }))
       const data = await feedApi.createManualBatch(articles)
       setSuccess(`${data.added}개 추가, ${data.skipped}개 건너뜀`)

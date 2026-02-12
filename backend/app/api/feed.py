@@ -26,6 +26,7 @@ from app.schemas.feed import (
 from app.services.dedup_service import DedupService
 from app.services.feed_service import FeedService
 from app.services.search_service import SearchService
+from app.services.sources.base_fetcher import BaseFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -166,8 +167,33 @@ async def preview_url(body: UrlPreviewRequest):
             desc_tag = soup.find("meta", attrs={"name": "description"})
             summary = (desc_tag["content"] if desc_tag and desc_tag.get("content") else None)
 
+        # 발행 시간 메타태그 추출
+        published_at = None
+        pub_meta_selectors = [
+            ("meta", {"property": "article:published_time"}),
+            ("meta", {"property": "og:article:published_time"}),
+            ("meta", {"attrs": {"name": "pubdate"}}),
+            ("meta", {"attrs": {"name": "publishdate"}}),
+        ]
+        for tag_name, kwargs in pub_meta_selectors:
+            if "attrs" in kwargs:
+                tag = soup.find(tag_name, **kwargs)
+            else:
+                tag = soup.find(tag_name, **kwargs)
+            if tag and tag.get("content"):
+                published_at = BaseFetcher.parse_datetime(tag["content"])
+                if published_at:
+                    break
+
+        # Fallback: <time datetime="..."> 태그
+        if not published_at:
+            time_tag = soup.find("time", attrs={"datetime": True})
+            if time_tag:
+                published_at = BaseFetcher.parse_datetime(time_tag["datetime"])
+
         return UrlPreviewResponse(
-            title=title, summary=summary, image_url=image_url, url=url
+            title=title, summary=summary, image_url=image_url, url=url,
+            published_at=published_at,
         )
     except httpx.HTTPStatusError as e:
         logger.error(f"URL 미리보기 HTTP 에러: {e}", exc_info=True)
@@ -252,6 +278,7 @@ async def create_manual_batch(
                 continue
 
             now = datetime.now(timezone.utc)
+            published_at = article.published_at or now
             item = FeedItem(
                 id=str(uuid.uuid4()),
                 source="manual",
@@ -259,7 +286,7 @@ async def create_manual_batch(
                 summary=article.summary,
                 url=url,
                 image_url=str(article.image_url) if article.image_url else None,
-                published_at=now,
+                published_at=published_at,
                 fetched_at=now,
                 url_hash=url_hash,
                 score=0,
@@ -320,6 +347,7 @@ async def create_manual_article(
             )
 
         now = datetime.now(timezone.utc)
+        published_at = body.published_at or now
         item = FeedItem(
             id=str(uuid.uuid4()),
             source="manual",
@@ -327,7 +355,7 @@ async def create_manual_article(
             summary=body.summary,
             url=url,
             image_url=str(body.image_url) if body.image_url else None,
-            published_at=now,
+            published_at=published_at,
             fetched_at=now,
             url_hash=url_hash,
             score=0,
@@ -336,7 +364,7 @@ async def create_manual_article(
         db.commit()
         db.refresh(item)
 
-        logger.info(f"수동 기사 추가 완료: id={item.id}")
+        logger.info(f"수동 기사 추가 완료: id={item.id} published_at={published_at}")
         return item
     except HTTPException:
         raise
