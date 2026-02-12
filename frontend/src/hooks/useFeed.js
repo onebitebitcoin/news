@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { feedApi, bookmarkApi } from '../api/feed'
 import { extractApiError } from '../api/client'
 
@@ -183,32 +183,49 @@ export function useSchedulerStatus() {
   return { status, loading, refresh: fetchStatus }
 }
 
+const POLL_ACTIVE_MS = 2000
+const POLL_IDLE_MS = 30000
+
 export function useFetchProgress() {
   const [progress, setProgress] = useState(null)
   const [loading, setLoading] = useState(true)
+  const timerRef = useRef(null)
+  const isRunningRef = useRef(false)
 
-  const fetchProgress = useCallback(async () => {
+  const scheduleNext = useCallback((data) => {
+    const running = data?.status === 'running'
+    isRunningRef.current = running
+    const delay = running ? POLL_ACTIVE_MS : POLL_IDLE_MS
+    timerRef.current = setTimeout(poll, delay)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const poll = useCallback(async () => {
     try {
       const data = await feedApi.getFetchProgress()
       setProgress(data)
+      setLoading(false)
+      scheduleNext(data)
       return data
     } catch (err) {
       console.error('Failed to fetch progress:', err)
-      return null
-    } finally {
       setLoading(false)
+      // 에러 시에도 유휴 간격으로 재시도
+      timerRef.current = setTimeout(poll, POLL_IDLE_MS)
+      return null
     }
-  }, [])
+  }, [scheduleNext])
 
   useEffect(() => {
-    // 즉시 첫 번째 호출
-    fetchProgress()
+    poll()
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [poll])
 
-    // 2초마다 폴링 (수집 중일 때 실시간 업데이트)
-    const intervalId = setInterval(fetchProgress, 2000)
+  const refresh = useCallback(async () => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    return poll()
+  }, [poll])
 
-    return () => clearInterval(intervalId)
-  }, [fetchProgress])
-
-  return { progress, loading, refresh: fetchProgress }
+  return { progress, loading, refresh }
 }

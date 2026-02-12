@@ -29,6 +29,12 @@ class PersistStage(PipelineStage):
 
     def _save_item(self, db, item_data: dict) -> None:
         """단일 아이템 저장"""
+        # raw에서 group_id 추출 (GroupingStage가 설정한 값)
+        raw_data = item_data.get("raw", {})
+        if isinstance(raw_data, str):
+            raw_data = json.loads(raw_data) if raw_data else {}
+        group_id = raw_data.get("dedup_group_id") or item_data["id"]
+
         feed_item = FeedItem(
             id=item_data["id"],
             source=item_data["source"],
@@ -45,6 +51,7 @@ class PersistStage(PipelineStage):
             raw=json.dumps(item_data.get("raw", {})),
             image_url=item_data.get("image_url"),
             category=item_data.get("category", "news"),
+            group_id=group_id,
         )
 
         db.add(feed_item)

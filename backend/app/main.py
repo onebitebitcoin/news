@@ -59,13 +59,25 @@ app.add_middleware(
 app.router.redirect_slashes = False
 
 
+# 캐시 가능한 경로와 TTL 매핑
+_CACHEABLE_PATHS = {
+    "/api/v1/categories": 300,
+    "/api/v1/sources": 300,
+    "/api/v1/trending": 120,
+}
+
+
 @app.middleware("http")
-async def add_no_cache_headers(request: Request, call_next):
+async def add_cache_headers(request: Request, call_next):
     response = await call_next(request)
     if request.url.path.startswith("/api/"):
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+        max_age = _CACHEABLE_PATHS.get(request.url.path)
+        if max_age:
+            response.headers["Cache-Control"] = f"public, max-age={max_age}"
+        else:
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
     return response
 
 

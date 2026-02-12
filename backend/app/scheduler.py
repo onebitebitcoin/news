@@ -12,6 +12,7 @@ from app.database import SessionLocal
 from app.scheduler_state import scheduler_state
 from app.services.fetch_engine import FetchEngine
 from app.services.market_data_service import update_market_data
+from app.utils.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,8 @@ async def scheduled_fetch():
             duplicates=result["total_duplicates"],
         )
 
+        # 캐시 무효화 (새 데이터 반영)
+        cache.clear()
         logger.info(
             f"[Scheduler] Fetch complete - "
             f"Saved: {result['total_saved']}, "

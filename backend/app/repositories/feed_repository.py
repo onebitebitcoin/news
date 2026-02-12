@@ -131,20 +131,6 @@ class FeedRepository:
         logger.debug(f"Bulk created {count} feed items")
         return count
 
-    def get_latest_published_at(
-        self,
-        category: Optional[str] = None,
-        source: Optional[str] = None,
-        search: Optional[str] = None,
-    ) -> Optional[datetime]:
-        """필터 조건에 맞는 최신 published_at 조회"""
-        query = self._apply_filters(
-            self.db.query(func.max(FeedItem.published_at)),
-            category, source, search,
-        )
-        result = query.scalar()
-        return result
-
     def get_grouped_feed(
         self,
         page: int = 1,
@@ -152,83 +138,109 @@ class FeedRepository:
         category: Optional[str] = None,
         source: Optional[str] = None,
         search: Optional[str] = None,
-    ) -> Tuple[List[Dict], int]:
+    ) -> Tuple[List[Dict], int, Optional[datetime]]:
         """
-        DB 레벨에서 그룹화된 피드 목록 조회
-        group_id가 같은 아이템을 그룹화하고, 각 그룹의 대표 아이템과 중복 개수 반환
-        """
-        # 그룹 키: group_id가 있으면 사용, 없으면 id 사용
-        group_key = func.coalesce(FeedItem.group_id, FeedItem.id)
+        DB 레벨에서 그룹화된 피드 목록 조회 (최적화)
 
-        # 필터 적용
-        base_query = self._apply_filters(
+        group_id 컬럼을 직접 사용 (COALESCE 제거 → 인덱스 활용).
+        N+1 루프를 IN clause 1회 쿼리로 교체.
+        last_updated_at도 함께 반환 (별도 쿼리 제거).
+
+        Returns: (grouped_data, total_groups, last_updated_at)
+        """
+        # 1) 그룹별 집계: count, max(published_at), 대표 아이템 id (가장 최신)
+        base = self._apply_filters(
             self.db.query(FeedItem), category, source, search
         )
 
-        # 그룹별 대표 아이템 선택 (ROW_NUMBER 사용)
-        # SQLite와 PostgreSQL 모두 지원
-        subquery = (
-            base_query
-            .with_entities(
+        group_agg = (
+            base.with_entities(
+                FeedItem.group_id,
+                func.count(FeedItem.id).label("cnt"),
+                func.max(FeedItem.published_at).label("max_pub"),
+            )
+            .group_by(FeedItem.group_id)
+            .subquery()
+        )
+
+        # 전체 그룹 수 + 전체 최신 published_at
+        stats = self.db.query(
+            func.count(),
+            func.max(group_agg.c.max_pub),
+        ).select_from(group_agg).one()
+        total_groups = stats[0] or 0
+        last_updated_at = stats[1]
+
+        # 2) 대표 아이템 선택 (ROW_NUMBER로 그룹 내 최신 1개)
+        rn_sub = (
+            base.with_entities(
                 FeedItem.id,
-                group_key.label("group_key"),
+                FeedItem.group_id,
                 func.row_number().over(
-                    partition_by=group_key,
-                    order_by=desc(func.coalesce(FeedItem.published_at, FeedItem.fetched_at))
-                ).label("rn")
+                    partition_by=FeedItem.group_id,
+                    order_by=desc(FeedItem.published_at),
+                ).label("rn"),
             )
             .subquery()
         )
-
-        # 대표 아이템만 선택 (rn = 1)
-        representative_ids_query = (
-            self.db.query(subquery.c.id)
-            .filter(subquery.c.rn == 1)
+        rep_ids_sub = (
+            self.db.query(rn_sub.c.id, rn_sub.c.group_id)
+            .filter(rn_sub.c.rn == 1)
             .subquery()
         )
 
-        # 그룹별 아이템 수 계산
-        count_subquery = (
-            base_query
-            .with_entities(
-                group_key.label("group_key"),
-                func.count(FeedItem.id).label("cnt")
-            )
-            .group_by(group_key)
-            .subquery()
-        )
-
-        # 전체 그룹 수 (페이지네이션 계산용)
-        total_groups = self.db.query(func.count()).select_from(count_subquery).scalar()
-
-        # 대표 아이템 조회 (페이지네이션 적용)
-        items_query = (
+        # 3) 대표 아이템 조회 (페이지네이션)
+        representative_items = (
             self.db.query(FeedItem)
-            .filter(FeedItem.id.in_(select(representative_ids_query)))
-            .order_by(desc(func.coalesce(FeedItem.published_at, FeedItem.fetched_at)))
+            .filter(FeedItem.id.in_(select(rep_ids_sub.c.id)))
+            .order_by(desc(FeedItem.published_at))
             .offset((page - 1) * page_size)
             .limit(page_size)
+            .all()
         )
-        representative_items = items_query.all()
 
-        # 각 대표 아이템의 그룹에 속한 중복 아이템 조회
+        if not representative_items:
+            return [], total_groups, last_updated_at
+
+        # 4) 그룹별 카운트 매핑 (대표 아이템의 group_id에 해당하는 것만)
+        rep_group_ids = [item.group_id for item in representative_items]
+        count_rows = (
+            base.with_entities(
+                FeedItem.group_id,
+                func.count(FeedItem.id).label("cnt"),
+            )
+            .filter(FeedItem.group_id.in_(rep_group_ids))
+            .group_by(FeedItem.group_id)
+            .all()
+        )
+        count_map = {row[0]: row[1] for row in count_rows}
+
+        # 5) 중복 아이템 일괄 조회 (대표 제외, IN clause 1회)
+        rep_ids = {item.id for item in representative_items}
+        dup_items = (
+            base.filter(
+                FeedItem.group_id.in_(rep_group_ids),
+                FeedItem.id.notin_(rep_ids),
+            )
+            .order_by(desc(FeedItem.published_at))
+            .all()
+        )
+
+        # group_id별 중복 아이템 매핑
+        dup_map: Dict[str, List[FeedItem]] = {}
+        for dup in dup_items:
+            dup_map.setdefault(dup.group_id, []).append(dup)
+
+        # 6) 결과 조립
         result = []
         for item in representative_items:
-            gk = item.group_id or item.id
-
-            # 중복 아이템 조회 (대표 아이템 제외)
-            duplicates_query = base_query.filter(
-                func.coalesce(FeedItem.group_id, FeedItem.id) == gk,
-                FeedItem.id != item.id,
-            ).order_by(desc(func.coalesce(FeedItem.published_at, FeedItem.fetched_at)))
-
-            duplicates = duplicates_query.all()
-
+            gid = item.group_id
+            duplicates = dup_map.get(gid, [])
             result.append({
                 "representative": item,
                 "duplicates": duplicates,
-                "duplicate_count": len(duplicates),
+                "duplicate_count": count_map.get(gid, 1) - 1,
             })
 
         logger.debug(f"Grouped feed: {len(result)} groups / {total_groups} total")
-        return result, total_groups
+        return result, total_groups, last_updated_at

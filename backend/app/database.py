@@ -1,3 +1,4 @@
+import json
 import logging
 
 from sqlalchemy import create_engine
@@ -47,6 +48,7 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created")
     migrate_market_snapshots()
+    backfill_group_ids()
 
 
 def migrate_market_snapshots():
@@ -75,3 +77,37 @@ def migrate_market_snapshots():
                 )
                 logger.info(f"Added column {col_name} to market_data_snapshots")
         conn.commit()
+
+
+def backfill_group_ids():
+    """group_id가 NULL인 기존 아이템에 group_id 백필 (멱등)"""
+    from app.models.feed_item import FeedItem
+
+    db = SessionLocal()
+    try:
+        null_items = db.query(FeedItem).filter(FeedItem.group_id.is_(None)).all()
+        if not null_items:
+            return
+
+        count = 0
+        for item in null_items:
+            # raw에서 dedup_group_id 추출 시도
+            group_id = None
+            if item.raw:
+                try:
+                    raw_data = json.loads(item.raw) if isinstance(item.raw, str) else item.raw
+                    group_id = raw_data.get("dedup_group_id")
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+
+            # fallback: 자기 id를 group_id로 설정
+            item.group_id = group_id or item.id
+            count += 1
+
+        db.commit()
+        logger.info(f"Backfilled group_id for {count} items")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to backfill group_ids: {e}", exc_info=True)
+    finally:
+        db.close()

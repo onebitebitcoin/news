@@ -154,6 +154,7 @@ class DedupGroupService:
             raw = self._parse_raw(item.raw)
             raw["dedup_group_id"] = group_id
             item.raw = json.dumps(raw)
+            item.group_id = group_id
 
     def _set_group_id_on_raw(self, item_data: dict, group_id: str) -> None:
         raw = item_data.get("raw")

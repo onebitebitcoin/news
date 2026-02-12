@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.repositories.bookmark_repository import BookmarkRepository
 from app.repositories.feed_repository import FeedRepository
 from app.schemas.feed import FeedItemDetail, FeedItemDuplicate, FeedItemResponse, FeedListResponse
+from app.utils.cache import cache
 from app.utils.json_utils import safe_parse_json
 
 logger = logging.getLogger(__name__)
@@ -38,18 +39,13 @@ class FeedService:
         search: Optional[str] = None,
     ) -> FeedListResponse:
         """피드 목록 조회 (DB 레벨 그룹화 + 페이지네이션)"""
-        # DB에서 그룹화된 결과 조회
-        grouped_data, total = self.feed_repo.get_grouped_feed(
+        # DB에서 그룹화된 결과 + last_updated_at 함께 조회
+        grouped_data, total, last_updated_at = self.feed_repo.get_grouped_feed(
             page=page,
             page_size=page_size,
             category=category,
             source=source,
             search=search,
-        )
-
-        # 최신 발행 시간 조회
-        last_updated_at = self.feed_repo.get_latest_published_at(
-            category=category, source=source, search=search,
         )
 
         # 북마크 상태 확인
@@ -99,18 +95,37 @@ class FeedService:
         )
 
     def get_trending(self, limit: int = 5) -> List[FeedItemResponse]:
-        """트렌딩 피드 조회"""
+        """트렌딩 피드 조회 (TTL 2분 캐시)"""
+        cache_key = f"trending:{limit}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         items = self.feed_repo.get_trending(limit)
         bookmarked_ids = self.bookmark_repo.get_item_ids()
-        return [self._build_feed_response(item, bookmarked_ids) for item in items]
+        result = [self._build_feed_response(item, bookmarked_ids) for item in items]
+        cache.set(cache_key, result, ttl=120)
+        return result
 
     def get_categories(self) -> List[str]:
-        """카테고리 목록"""
-        return self.feed_repo.get_categories()
+        """카테고리 목록 (TTL 5분 캐시)"""
+        cached = cache.get("categories")
+        if cached is not None:
+            return cached
+
+        result = self.feed_repo.get_categories()
+        cache.set("categories", result, ttl=300)
+        return result
 
     def get_sources(self) -> List[str]:
-        """소스 목록"""
-        return self.feed_repo.get_sources()
+        """소스 목록 (TTL 5분 캐시)"""
+        cached = cache.get("sources")
+        if cached is not None:
+            return cached
+
+        result = self.feed_repo.get_sources()
+        cache.set("sources", result, ttl=300)
+        return result
 
     def _build_feed_response(
         self,
