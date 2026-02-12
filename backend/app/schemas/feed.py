@@ -77,3 +77,47 @@ class ManualArticleCreate(BaseModel):
     title: str
     summary: Optional[str] = None
     image_url: Optional[str] = None
+
+
+class SearchArticlesRequest(BaseModel):
+    """키워드 기사 검색 요청"""
+    query: str
+    max_results: int = 20
+
+
+class SearchArticleItem(BaseModel):
+    """검색 결과 개별 아이템"""
+    title: str
+    url: str
+    summary: Optional[str] = None
+    source_ref: Optional[str] = None
+    published_at: Optional[datetime] = None
+    is_duplicate: bool = False
+
+
+class SearchArticlesResponse(BaseModel):
+    """키워드 기사 검색 응답"""
+    query: str
+    items: List[SearchArticleItem]
+    total: int
+
+
+class BatchManualCreate(BaseModel):
+    """기사 일괄 추가 요청"""
+    articles: List[ManualArticleCreate]
+
+
+class BatchManualResult(BaseModel):
+    """일괄 추가 개별 결과"""
+    url: str
+    success: bool
+    id: Optional[str] = None
+    error: Optional[str] = None
+
+
+class BatchManualResponse(BaseModel):
+    """기사 일괄 추가 응답"""
+    total: int
+    added: int
+    skipped: int
+    results: List[BatchManualResult]

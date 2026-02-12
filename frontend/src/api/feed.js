@@ -69,6 +69,18 @@ export const feedApi = {
     const { data } = await client.post('/feed/manual', { url, title, summary, image_url })
     return data
   },
+
+  // 키워드 기사 검색
+  searchArticles: async (query, maxResults = 20) => {
+    const { data } = await client.post('/feed/search', { query, max_results: maxResults })
+    return data
+  },
+
+  // 기사 일괄 추가
+  createManualBatch: async (articles) => {
+    const { data } = await client.post('/feed/manual/batch', { articles })
+    return data
+  },
 }
 
 export const adminApi = {

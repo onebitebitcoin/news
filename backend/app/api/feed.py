@@ -11,15 +11,21 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.feed_item import FeedItem
 from app.schemas.feed import (
+    BatchManualCreate,
+    BatchManualResponse,
+    BatchManualResult,
     FeedItemDetail,
     FeedItemResponse,
     FeedListResponse,
     ManualArticleCreate,
+    SearchArticlesRequest,
+    SearchArticlesResponse,
     UrlPreviewRequest,
     UrlPreviewResponse,
 )
 from app.services.dedup_service import DedupService
 from app.services.feed_service import FeedService
+from app.services.search_service import SearchService
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +199,103 @@ async def preview_url(body: UrlPreviewRequest):
                 "type": type(e).__name__,
             },
         )
+
+
+@router.post("/feed/search", response_model=SearchArticlesResponse)
+async def search_articles(
+    body: SearchArticlesRequest,
+    db: Session = Depends(get_db),
+):
+    """키워드로 기사 검색 (Google News RSS)"""
+    logger.info(f"POST /feed/search query={body.query} max_results={body.max_results}")
+    try:
+        service = SearchService(db)
+        items = await service.search(body.query, body.max_results)
+        return SearchArticlesResponse(
+            query=body.query,
+            items=items,
+            total=len(items),
+        )
+    except Exception as e:
+        logger.error(f"기사 검색 실패: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "기사 검색 중 오류가 발생했습니다",
+                "error": str(e),
+                "type": type(e).__name__,
+            },
+        )
+
+
+@router.post("/feed/manual/batch", response_model=BatchManualResponse)
+async def create_manual_batch(
+    body: BatchManualCreate,
+    db: Session = Depends(get_db),
+):
+    """기사 일괄 추가"""
+    logger.info(f"POST /feed/manual/batch count={len(body.articles)}")
+    results: List[BatchManualResult] = []
+    added = 0
+    skipped = 0
+
+    for article in body.articles:
+        url = str(article.url)
+        try:
+            url_hash = DedupService.create_hash(url)
+
+            if DedupService.is_duplicate(db, url_hash):
+                results.append(BatchManualResult(
+                    url=url, success=False, error="이미 등록된 URL",
+                ))
+                skipped += 1
+                continue
+
+            now = datetime.now(timezone.utc)
+            item = FeedItem(
+                id=str(uuid.uuid4()),
+                source="manual",
+                title=article.title,
+                summary=article.summary,
+                url=url,
+                image_url=str(article.image_url) if article.image_url else None,
+                published_at=now,
+                fetched_at=now,
+                url_hash=url_hash,
+                score=0,
+            )
+            db.add(item)
+            db.flush()
+            results.append(BatchManualResult(url=url, success=True, id=item.id))
+            added += 1
+        except Exception as e:
+            logger.error(f"일괄 추가 개별 실패: url={url}, error={e}")
+            results.append(BatchManualResult(
+                url=url, success=False, error=str(e),
+            ))
+            skipped += 1
+
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"일괄 추가 커밋 실패: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "기사 일괄 추가 커밋 중 오류가 발생했습니다",
+                "error": str(e),
+                "type": type(e).__name__,
+            },
+        )
+
+    logger.info(f"일괄 추가 완료: added={added}, skipped={skipped}")
+    return BatchManualResponse(
+        total=len(body.articles),
+        added=added,
+        skipped=skipped,
+        results=results,
+    )
 
 
 @router.post("/feed/manual", response_model=FeedItemResponse)
