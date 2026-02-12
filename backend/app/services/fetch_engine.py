@@ -207,11 +207,11 @@ class FetchEngine:
             )
 
             for stage in self.stages:
-                result = stage.process(context)
-                if asyncio.iscoroutine(result):
-                    context = await result
+                stage_result = stage.process(context)
+                if asyncio.iscoroutine(stage_result):
+                    context = await stage_result
                 else:
-                    context = result
+                    context = stage_result
 
             # 결과 수집
             result["duplicates"] = context.duplicates
