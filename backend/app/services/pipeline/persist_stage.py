@@ -15,15 +15,24 @@ class PersistStage(PipelineStage):
 
     def process(self, context: PipelineContext) -> PipelineContext:
         """아이템들을 DB에 저장"""
+        failed = 0
         for item_data in context.items:
             try:
-                self._save_item(context.db, item_data)
+                with context.db.begin_nested():
+                    self._save_item(context.db, item_data)
                 context.saved += 1
             except Exception as e:
+                failed += 1
                 logger.error(
                     f"[{context.source_name}] Error saving item: {e}",
                     exc_info=True
                 )
+
+        if context.saved > 0:
+            context.db.commit()
+
+        if failed > 0:
+            logger.warning(f"[{context.source_name}] Save failures: {failed}")
 
         return context
 
@@ -51,10 +60,10 @@ class PersistStage(PipelineStage):
             raw=json.dumps(item_data.get("raw", {})),
             image_url=item_data.get("image_url"),
             category=item_data.get("category", "news"),
+            translation_status=item_data.get("translation_status"),
             group_id=group_id,
         )
 
         db.add(feed_item)
-        db.commit()
 
         logger.debug(f"Saved: {feed_item.title[:50]}...")

@@ -11,7 +11,8 @@ class ApiKey(Base):
     __tablename__ = "api_keys"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    key = Column(String, unique=True, index=True, nullable=False)
+    key_prefix = Column(String, index=True, nullable=False)
+    key_hash = Column(String, unique=True, index=True, nullable=False)
     name = Column(String, nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     is_active = Column(Boolean, nullable=False, default=True)

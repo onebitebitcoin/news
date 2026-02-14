@@ -71,11 +71,6 @@ export default function ApiKeysPage() {
     }
   }
 
-  const maskKey = (key) => {
-    if (!key || key.length <= 8) return key
-    return key.slice(0, 8) + '...' + key.slice(-4)
-  }
-
   const formatDate = (dateStr) => {
     const date = new Date(dateStr)
     return date.toLocaleDateString('ko-KR', {
@@ -191,18 +186,8 @@ export default function ApiKeysPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <code className="text-xs text-zinc-500 font-mono">
-                      {maskKey(apiKey.key)}
+                      {apiKey.masked_key}
                     </code>
-                    <button
-                      onClick={() => handleCopy(apiKey.key, apiKey.id)}
-                      className="p-1 rounded hover:bg-zinc-800 transition-colors"
-                    >
-                      {copiedId === apiKey.id ? (
-                        <Check className="w-3.5 h-3.5 text-green-400" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5 text-zinc-500" />
-                      )}
-                    </button>
                   </div>
                   <p className="text-xs text-zinc-600 mt-1">{formatDate(apiKey.created_at)}</p>
                 </div>

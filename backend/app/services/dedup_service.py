@@ -37,6 +37,19 @@ class DedupService:
         return exists
 
     @staticmethod
+    def get_existing_hashes(db: Session, url_hashes: list[str]) -> set[str]:
+        """해시 집합 일괄 조회"""
+        if not url_hashes:
+            return set()
+
+        rows = (
+            db.query(FeedItem.url_hash)
+            .filter(FeedItem.url_hash.in_(url_hashes))
+            .all()
+        )
+        return {row[0] for row in rows if row[0]}
+
+    @staticmethod
     def find_existing(db: Session, url_hash: str) -> Optional[FeedItem]:
         """해시로 기존 아이템 조회"""
         return db.query(FeedItem).filter(

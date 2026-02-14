@@ -31,6 +31,7 @@ class TranslateStage(PipelineStage):
                 item["title_ko"] = item["title"]
                 item["summary_ko"] = item.get("summary", "")
                 item["_translated"] = True
+                item["translation_status"] = "skipped"
             return context
 
         try:
@@ -40,26 +41,26 @@ class TranslateStage(PipelineStage):
         except Exception as e:
             logger.error(f"[{context.source_name}] Batch translation error: {e}")
             context.translation_failed = len(context.items)
-            context.items = []
+            for item in context.items:
+                item["_translated"] = False
+                item["translation_status"] = "failed"
             return context
 
-        # 번역 실패한 아이템 필터링
-        translated_items = []
+        # 번역 상태 반영 (실패 시 fail-open으로 원문 유지)
         for item_data in context.items:
             if not item_data.get("_translated", False):
                 context.translation_failed += 1
+                item_data["translation_status"] = "failed"
                 logger.debug(
-                    f"[{context.source_name}] Skipping untranslated item: "
+                    f"[{context.source_name}] Keeping untranslated item: "
                     f"{item_data.get('id', 'unknown')}"
                 )
             else:
-                translated_items.append(item_data)
+                item_data["translation_status"] = "ok"
 
         if context.translation_failed > 0:
             logger.warning(
-                f"[{context.source_name}] {context.translation_failed} items skipped "
+                f"[{context.source_name}] {context.translation_failed} items kept in original language "
                 f"due to translation failure"
             )
-
-        context.items = translated_items
         return context

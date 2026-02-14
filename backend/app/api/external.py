@@ -7,7 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import verify_api_key
+from app.api.response import ok
 from app.database import get_db
+from app.schemas.common import ApiResponse
 from app.schemas.external import (
     ExternalArticleDetail,
     ExternalArticleListResponse,
@@ -23,7 +25,7 @@ router = APIRouter(
 )
 
 
-@router.get("/articles", response_model=ExternalArticleListResponse)
+@router.get("/articles", response_model=ApiResponse[ExternalArticleListResponse])
 async def get_articles(
     page: int = 1,
     page_size: int = 20,
@@ -52,16 +54,16 @@ async def get_articles(
         search=search,
     )
 
-    return ExternalArticleListResponse(
+    return ok(ExternalArticleListResponse(
         articles=articles,
         total=total,
         page=page,
         page_size=page_size,
         has_next=(page * page_size) < total,
-    )
+    ))
 
 
-@router.get("/articles/{article_id}", response_model=ExternalArticleDetail)
+@router.get("/articles/{article_id}", response_model=ApiResponse[ExternalArticleDetail])
 async def get_article_detail(
     article_id: str,
     db: Session = Depends(get_db),
@@ -76,18 +78,18 @@ async def get_article_detail(
             detail={"message": f"기사를 찾을 수 없습니다: {article_id}"},
         )
 
-    return article
+    return ok(article)
 
 
-@router.get("/sources")
+@router.get("/sources", response_model=ApiResponse[dict])
 async def get_sources(db: Session = Depends(get_db)):
     """소스 목록 조회"""
     service = ExternalService(db)
-    return {"sources": service.get_sources()}
+    return ok({"sources": service.get_sources()})
 
 
-@router.get("/categories")
+@router.get("/categories", response_model=ApiResponse[dict])
 async def get_categories(db: Session = Depends(get_db)):
     """카테고리 목록 조회"""
     service = ExternalService(db)
-    return {"categories": service.get_categories()}
+    return ok({"categories": service.get_categories()})

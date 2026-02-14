@@ -8,8 +8,10 @@ from bs4 import BeautifulSoup
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.api.response import ok
 from app.database import get_db
 from app.models.feed_item import FeedItem
+from app.schemas.common import ApiResponse
 from app.schemas.feed import (
     BatchManualCreate,
     BatchManualResponse,
@@ -33,7 +35,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/feed", response_model=FeedListResponse)
+@router.get("/feed", response_model=ApiResponse[FeedListResponse])
 async def get_feed(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -46,13 +48,14 @@ async def get_feed(
     logger.info(f"GET /feed page={page} category={category} search={search}")
     try:
         service = FeedService(db)
-        return service.get_feed_list(
+        result = service.get_feed_list(
             page=page,
             page_size=page_size,
             category=category,
             source=source,
             search=search,
         )
+        return ok(result)
     except HTTPException:
         raise
     except Exception as e:
@@ -67,7 +70,7 @@ async def get_feed(
         )
 
 
-@router.get("/feed/trending", response_model=List[FeedItemResponse])
+@router.get("/feed/trending", response_model=ApiResponse[List[FeedItemResponse]])
 async def get_trending(
     limit: int = Query(5, ge=1, le=20),
     db: Session = Depends(get_db),
@@ -76,7 +79,7 @@ async def get_trending(
     logger.info(f"GET /feed/trending limit={limit}")
     try:
         service = FeedService(db)
-        return service.get_trending(limit)
+        return ok(service.get_trending(limit))
     except HTTPException:
         raise
     except Exception as e:
@@ -91,13 +94,13 @@ async def get_trending(
         )
 
 
-@router.get("/feed/categories", response_model=List[str])
+@router.get("/feed/categories", response_model=ApiResponse[List[str]])
 async def get_categories(db: Session = Depends(get_db)):
     """카테고리 목록"""
     logger.info("GET /feed/categories")
     try:
         service = FeedService(db)
-        return service.get_categories()
+        return ok(service.get_categories())
     except HTTPException:
         raise
     except Exception as e:
@@ -112,13 +115,13 @@ async def get_categories(db: Session = Depends(get_db)):
         )
 
 
-@router.get("/feed/sources", response_model=List[str])
+@router.get("/feed/sources", response_model=ApiResponse[List[str]])
 async def get_sources(db: Session = Depends(get_db)):
     """소스 목록"""
     logger.info("GET /feed/sources")
     try:
         service = FeedService(db)
-        return service.get_sources()
+        return ok(service.get_sources())
     except HTTPException:
         raise
     except Exception as e:
@@ -133,7 +136,7 @@ async def get_sources(db: Session = Depends(get_db)):
         )
 
 
-@router.post("/feed/preview", response_model=UrlPreviewResponse)
+@router.post("/feed/preview", response_model=ApiResponse[UrlPreviewResponse])
 async def preview_url(body: UrlPreviewRequest):
     """URL 미리보기 - Open Graph / meta 태그 파싱"""
     url = str(body.url)
@@ -191,10 +194,10 @@ async def preview_url(body: UrlPreviewRequest):
             if time_tag:
                 published_at = BaseFetcher.parse_datetime(time_tag["datetime"])
 
-        return UrlPreviewResponse(
+        return ok(UrlPreviewResponse(
             title=title, summary=summary, image_url=image_url, url=url,
             published_at=published_at,
-        )
+        ))
     except httpx.HTTPStatusError as e:
         logger.error(f"URL 미리보기 HTTP 에러: {e}", exc_info=True)
         raise HTTPException(
@@ -227,7 +230,7 @@ async def preview_url(body: UrlPreviewRequest):
         )
 
 
-@router.post("/feed/search", response_model=SearchArticlesResponse)
+@router.post("/feed/search", response_model=ApiResponse[SearchArticlesResponse])
 async def search_articles(
     body: SearchArticlesRequest,
     db: Session = Depends(get_db),
@@ -237,11 +240,11 @@ async def search_articles(
     try:
         service = SearchService(db)
         items = await service.search(body.query, body.max_results)
-        return SearchArticlesResponse(
+        return ok(SearchArticlesResponse(
             query=body.query,
             items=items,
             total=len(items),
-        )
+        ))
     except Exception as e:
         logger.error(f"기사 검색 실패: {e}", exc_info=True)
         raise HTTPException(
@@ -254,7 +257,7 @@ async def search_articles(
         )
 
 
-@router.post("/feed/manual/batch", response_model=BatchManualResponse)
+@router.post("/feed/manual/batch", response_model=ApiResponse[BatchManualResponse])
 async def create_manual_batch(
     body: BatchManualCreate,
     db: Session = Depends(get_db),
@@ -290,6 +293,7 @@ async def create_manual_batch(
                 fetched_at=now,
                 url_hash=url_hash,
                 score=0,
+                translation_status="skipped",
             )
             db.add(item)
             db.flush()
@@ -317,15 +321,15 @@ async def create_manual_batch(
         )
 
     logger.info(f"일괄 추가 완료: added={added}, skipped={skipped}")
-    return BatchManualResponse(
+    return ok(BatchManualResponse(
         total=len(body.articles),
         added=added,
         skipped=skipped,
         results=results,
-    )
+    ))
 
 
-@router.post("/feed/manual", response_model=FeedItemResponse)
+@router.post("/feed/manual", response_model=ApiResponse[FeedItemResponse])
 async def create_manual_article(
     body: ManualArticleCreate,
     db: Session = Depends(get_db),
@@ -359,13 +363,14 @@ async def create_manual_article(
             fetched_at=now,
             url_hash=url_hash,
             score=0,
+            translation_status="skipped",
         )
         db.add(item)
         db.commit()
         db.refresh(item)
 
         logger.info(f"수동 기사 추가 완료: id={item.id} published_at={published_at}")
-        return item
+        return ok(FeedItemResponse.model_validate(item))
     except HTTPException:
         raise
     except Exception as e:
@@ -381,7 +386,7 @@ async def create_manual_article(
         )
 
 
-@router.get("/feed/{item_id}", response_model=FeedItemDetail)
+@router.get("/feed/{item_id}", response_model=ApiResponse[FeedItemDetail])
 async def get_feed_detail(
     item_id: str,
     db: Session = Depends(get_db),
@@ -393,7 +398,7 @@ async def get_feed_detail(
         item = service.get_feed_detail(item_id)
         if not item:
             raise HTTPException(status_code=404, detail="Feed item not found")
-        return item
+        return ok(item)
     except HTTPException:
         raise
     except Exception as e:

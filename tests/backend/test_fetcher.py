@@ -265,7 +265,9 @@ class TestAdminAPI:
         response = client.get("/api/v1/admin/sources")
 
         assert response.status_code == 200
-        data = response.json()
+        payload = response.json()
+        assert payload["success"] is True
+        data = payload["data"]
         assert "sources" in data
         assert "available_sources" in data
         assert "googlenews" in data["available_sources"]

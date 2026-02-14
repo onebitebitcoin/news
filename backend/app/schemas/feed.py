@@ -32,6 +32,7 @@ class FeedItemResponse(BaseModel):
     is_new: bool = False
     fetched_at: Optional[datetime] = None
     group_id: Optional[str] = None
+    translation_status: Optional[str] = None
     duplicate_count: int = 0
     duplicates: List[FeedItemDuplicate] = []
 

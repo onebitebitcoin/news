@@ -6,9 +6,11 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.api.response import ok
 from app.database import get_db
 from app.market_data_state import market_data_state
 from app.models.market_data_snapshot import MarketDataSnapshot
+from app.schemas.common import ApiResponse
 from app.schemas.market import (
     MarketDataDaily,
     MarketDataResponse,
@@ -24,14 +26,14 @@ router = APIRouter(
 )
 
 
-@router.get("/data", response_model=MarketDataResponse)
+@router.get("/data", response_model=ApiResponse[MarketDataResponse])
 async def get_market_data():
     """캐시된 시장 데이터 반환"""
     data = market_data_state.get_all()
-    return data
+    return ok(MarketDataResponse(**data))
 
 
-@router.get("/history", response_model=MarketHistoryResponse)
+@router.get("/history", response_model=ApiResponse[MarketHistoryResponse])
 async def get_market_history(
     days: int = Query(default=7, ge=1, le=90, description="조회 일수 (1~90)"),
     db: Session = Depends(get_db),
@@ -100,4 +102,4 @@ async def get_market_history(
     )
     result.append(today_entry)
 
-    return MarketHistoryResponse(days=days, data=result)
+    return ok(MarketHistoryResponse(days=days, data=result))

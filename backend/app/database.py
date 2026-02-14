@@ -1,5 +1,5 @@
-import json
 import logging
+import os
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
@@ -36,7 +36,11 @@ def get_db():
 
 
 def init_db():
-    """데이터베이스 테이블 생성"""
+    """데이터베이스 초기화
+
+    운영 환경에서는 Alembic 마이그레이션을 사용해야 하며, 런타임 스키마 변경은 수행하지 않는다.
+    테스트 환경에서만 테이블 자동 생성을 허용한다.
+    """
     from app.models import (  # noqa: F401
         api_key,
         bookmark,
@@ -45,69 +49,8 @@ def init_db():
         source_status,
     )
 
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created")
-    migrate_market_snapshots()
-    backfill_group_ids()
-
-
-def migrate_market_snapshots():
-    """market_data_snapshots 테이블에 새 컬럼 추가 (없으면)"""
-    from sqlalchemy import inspect, text
-
-    inspector = inspect(engine)
-    if "market_data_snapshots" not in inspector.get_table_names():
-        return
-
-    existing = {col["name"] for col in inspector.get_columns("market_data_snapshots")}
-    new_columns = [
-        ("difficulty_adjustment", "TEXT"),
-        ("hashrate_data", "TEXT"),
-        ("mempool_stats", "TEXT"),
-        ("block_height", "INTEGER"),
-    ]
-
-    with engine.connect() as conn:
-        for col_name, col_type in new_columns:
-            if col_name not in existing:
-                conn.execute(
-                    text(
-                        f"ALTER TABLE market_data_snapshots ADD COLUMN {col_name} {col_type}"
-                    )
-                )
-                logger.info(f"Added column {col_name} to market_data_snapshots")
-        conn.commit()
-
-
-def backfill_group_ids():
-    """group_id가 NULL인 기존 아이템에 group_id 백필 (멱등)"""
-    from app.models.feed_item import FeedItem
-
-    db = SessionLocal()
-    try:
-        null_items = db.query(FeedItem).filter(FeedItem.group_id.is_(None)).all()
-        if not null_items:
-            return
-
-        count = 0
-        for item in null_items:
-            # raw에서 dedup_group_id 추출 시도
-            group_id = None
-            if item.raw:
-                try:
-                    raw_data = json.loads(item.raw) if isinstance(item.raw, str) else item.raw
-                    group_id = raw_data.get("dedup_group_id")
-                except (json.JSONDecodeError, AttributeError):
-                    pass
-
-            # fallback: 자기 id를 group_id로 설정
-            item.group_id = group_id or item.id
-            count += 1
-
-        db.commit()
-        logger.info(f"Backfilled group_id for {count} items")
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Failed to backfill group_ids: {e}", exc_info=True)
-    finally:
-        db.close()
+    if os.getenv("TESTING", "").lower() == "true":
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created for testing environment")
+    else:
+        logger.info("Skipping runtime schema mutation. Apply migrations with Alembic.")

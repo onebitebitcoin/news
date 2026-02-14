@@ -15,12 +15,19 @@ class ApiKeyResponse(BaseModel):
 
     id: int
     name: str
-    key: str
+    key_prefix: str
+    masked_key: str
     created_at: datetime
     is_active: bool
 
     class Config:
         from_attributes = True
+
+
+class ApiKeyCreatedResponse(ApiKeyResponse):
+    """API 키 생성 응답 (평문 키 1회 노출)"""
+
+    key: str
 
 
 class ApiKeyListResponse(BaseModel):

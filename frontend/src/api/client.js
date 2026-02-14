@@ -19,7 +19,20 @@ client.interceptors.request.use((config) => {
 
 // Response 인터셉터 - 에러 로깅
 client.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const payload = response.data
+    if (payload && typeof payload === 'object' && 'success' in payload) {
+      if (payload.success) {
+        return { ...response, data: payload.data }
+      }
+
+      const apiError = new Error(payload?.error?.message || '요청 처리 중 오류가 발생했습니다')
+      apiError.response = { ...response, data: payload }
+      throw apiError
+    }
+
+    return response
+  },
   (error) => {
     console.error('[API Error]', {
       url: error.config?.url,
@@ -39,6 +52,15 @@ export function extractApiError(err) {
   if (err.response) {
     const { status, data } = err.response
     const detail = data?.detail
+
+    if (typeof data?.success === 'boolean' && data.success === false) {
+      return {
+        message: data?.error?.message || `서버 오류 (${status})`,
+        status,
+        detail: data?.error?.details || null,
+        type: data?.error?.code || null,
+      }
+    }
 
     // 백엔드가 구조화된 detail 객체를 반환한 경우
     if (detail && typeof detail === 'object') {
