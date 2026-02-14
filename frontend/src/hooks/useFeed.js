@@ -61,7 +61,7 @@ export function useFeed(options = {}) {
         i.id === itemId ? { ...i, is_bookmarked: !i.is_bookmarked } : i
       ))
     } catch (err) {
-      console.error('Bookmark toggle failed:', err)
+      setError(extractApiError(err))
     }
   }, [items])
 
@@ -89,39 +89,53 @@ export function useFeed(options = {}) {
 function useFetchOnMount(fetchFn, initialValue = []) {
   const [data, setData] = useState(initialValue)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await fetchFn()
+      setData(result)
+      return result
+    } catch (err) {
+      const apiError = extractApiError(err)
+      setError(apiError)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }, [fetchFn])
 
   useEffect(() => {
-    let cancelled = false
+    let mounted = true
     const run = async () => {
-      try {
-        const result = await fetchFn()
-        if (!cancelled) setData(result)
-      } catch (err) {
-        console.error('Fetch failed:', err)
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
+      if (!mounted) return
+      await refresh()
     }
     run()
-    return () => { cancelled = true }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { mounted = false }
+  }, [refresh])
 
-  return { data, loading }
+  return { data, loading, error, refresh }
 }
 
 export function useTrending() {
-  const { data, loading } = useFetchOnMount(() => feedApi.getTrending(5))
-  return { items: data, loading }
+  const fetchTrending = useCallback(() => feedApi.getTrending(5), [])
+  const { data, loading, error, refresh } = useFetchOnMount(fetchTrending)
+  return { items: data, loading, error, refresh }
 }
 
 export function useCategories() {
-  const { data, loading } = useFetchOnMount(() => feedApi.getCategories())
-  return { categories: data, loading }
+  const fetchCategories = useCallback(() => feedApi.getCategories(), [])
+  const { data, loading, error, refresh } = useFetchOnMount(fetchCategories)
+  return { categories: data, loading, error, refresh }
 }
 
 export function useSources() {
-  const { data, loading } = useFetchOnMount(() => feedApi.getSources())
-  return { sources: data, loading }
+  const fetchSources = useCallback(() => feedApi.getSources(), [])
+  const { data, loading, error, refresh } = useFetchOnMount(fetchSources)
+  return { sources: data, loading, error, refresh }
 }
 
 export function useBookmarks() {
@@ -147,7 +161,7 @@ export function useBookmarks() {
       await bookmarkApi.remove(itemId)
       setItems(prev => prev.filter(b => b.item.id !== itemId))
     } catch (err) {
-      console.error('Failed to remove bookmark:', err)
+      setError(extractApiError(err))
     }
   }, [])
 
@@ -161,13 +175,15 @@ export function useBookmarks() {
 export function useSchedulerStatus() {
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const fetchStatus = useCallback(async () => {
     try {
+      setError(null)
       const data = await feedApi.getSchedulerStatus()
       setStatus(data)
     } catch (err) {
-      console.error('Failed to fetch scheduler status:', err)
+      setError(extractApiError(err))
     } finally {
       setLoading(false)
     }
@@ -180,7 +196,7 @@ export function useSchedulerStatus() {
     return () => clearInterval(interval)
   }, [fetchStatus])
 
-  return { status, loading, refresh: fetchStatus }
+  return { status, loading, error, refresh: fetchStatus }
 }
 
 const POLL_ACTIVE_MS = 2000
@@ -189,6 +205,7 @@ const POLL_IDLE_MS = 30000
 export function useFetchProgress() {
   const [progress, setProgress] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const timerRef = useRef(null)
   const isRunningRef = useRef(false)
 
@@ -201,13 +218,14 @@ export function useFetchProgress() {
 
   const poll = useCallback(async () => {
     try {
+      setError(null)
       const data = await feedApi.getFetchProgress()
       setProgress(data)
       setLoading(false)
       scheduleNext(data)
       return data
     } catch (err) {
-      console.error('Failed to fetch progress:', err)
+      setError(extractApiError(err))
       setLoading(false)
       // 에러 시에도 유휴 간격으로 재시도
       timerRef.current = setTimeout(poll, POLL_IDLE_MS)
@@ -227,5 +245,5 @@ export function useFetchProgress() {
     return poll()
   }, [poll])
 
-  return { progress, loading, refresh }
+  return { progress, loading, error, refresh }
 }

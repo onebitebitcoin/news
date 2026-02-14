@@ -19,8 +19,8 @@ export default function HomePage() {
   const [manualRefreshing, setManualRefreshing] = useState(false)
   const noticeTimeoutRef = useRef(null)
 
-  const { categories } = useCategories()
-  const { sources } = useSources()
+  const { categories, error: categoriesError, refresh: refreshCategories } = useCategories()
+  const { sources, error: sourcesError, refresh: refreshSources } = useSources()
   const {
     items,
     loading,
@@ -32,8 +32,19 @@ export default function HomePage() {
     lastUpdatedAt,
   } = useFeed({ category, search, source })
 
-  const { status: schedulerStatus, refresh: refreshScheduler } = useSchedulerStatus()
-  const { progress: fetchProgress, loading: progressLoading, refresh: refreshProgress } = useFetchProgress()
+  const {
+    status: schedulerStatus,
+    error: schedulerError,
+    refresh: refreshScheduler,
+  } = useSchedulerStatus()
+  const {
+    progress: fetchProgress,
+    loading: progressLoading,
+    error: fetchProgressError,
+    refresh: refreshProgress,
+  } = useFetchProgress()
+
+  const metaError = categoriesError || sourcesError || schedulerError || fetchProgressError
 
   // 최신 기사 시간 (피드 API 기반) 또는 마지막 수집 시간 (스케줄러 기반) fallback
   const lastUpdateText = useMemo(() => {
@@ -185,6 +196,15 @@ export default function HomePage() {
 
       {/* Error */}
       <ErrorAlert message={error} onRetry={refresh} />
+      <ErrorAlert
+        message={metaError}
+        onRetry={() => Promise.all([
+          refreshCategories(),
+          refreshSources(),
+          refreshScheduler(),
+          refreshProgress(),
+        ])}
+      />
 
       {/* Feed List */}
       <FeedList

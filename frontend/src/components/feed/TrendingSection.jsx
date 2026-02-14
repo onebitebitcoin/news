@@ -1,8 +1,9 @@
 import { TrendingUp } from 'lucide-react'
+import ErrorAlert from '../common/ErrorAlert'
 import { useTrending } from '../../hooks/useFeed'
 
 export default function TrendingSection() {
-  const { items, loading } = useTrending()
+  const { items, loading, error, refresh } = useTrending()
 
   if (loading) {
     return (
@@ -21,6 +22,10 @@ export default function TrendingSection() {
         </div>
       </div>
     )
+  }
+
+  if (error) {
+    return <ErrorAlert message={error} onRetry={refresh} />
   }
 
   if (items.length === 0) return null
