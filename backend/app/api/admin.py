@@ -33,11 +33,12 @@ def _mask_key(prefix: str) -> str:
 
 
 def _serialize_api_key(key) -> ApiKeyResponse:
+    key_prefix = key.key_prefix or f"legacy_{key.id}"
     return ApiKeyResponse(
         id=key.id,
         name=key.name,
-        key_prefix=key.key_prefix,
-        masked_key=_mask_key(key.key_prefix),
+        key_prefix=key_prefix,
+        masked_key=_mask_key(key_prefix),
         created_at=key.created_at,
         is_active=key.is_active,
     )
