@@ -1,6 +1,8 @@
-"""비트코인 전용 필터링 스테이지 - 알트코인 전용 기사 제외"""
+"""비트코인 전용 필터링 스테이지 - 광고/알트코인/노이즈 제외"""
 
 import logging
+import re
+from typing import Set
 
 from app.services.pipeline.base_stage import PipelineContext, PipelineStage
 
@@ -13,36 +15,37 @@ BITCOIN_ONLY_SOURCES = {
     "theminermag",
 }
 
-# 비트코인 관련 키워드 (소문자)
+# 통과 필수 키워드 후보
 BITCOIN_KEYWORDS = {
     "bitcoin",
     "btc",
+    "비트코인",
     "satoshi",
+    "사토시",
+    "lightning",
     "lightning network",
+    "라이트닝",
+    "라이트닝 네트워크",
     "halving",
     "halvening",
-    "비트코인",
-    "사토시",
-    "라이트닝 네트워크",
     "반감기",
-    "block reward",
+    "mempool",
+    "hashrate",
+    "hash rate",
+    "채굴",
     "mining",
     "miner",
-    "hash rate",
-    "hashrate",
-    "difficulty adjustment",
-    "mempool",
     "utxo",
-    "segwit",
     "taproot",
+    "segwit",
     "ordinals",
     "inscriptions",
     "brc-20",
-    "nostr",
-    "sats",
+    "bitcoin core",
+    "비트코인 코어",
 }
 
-# 알트코인 전용 키워드 (소문자)
+# 제외 키워드 (알트코인 중심)
 ALTCOIN_KEYWORDS = {
     "ethereum",
     "eth",
@@ -88,7 +91,6 @@ ALTCOIN_KEYWORDS = {
     "nft",
     "nfts",
     "airdrop",
-    "token launch",
     "ico",
     "ido",
     "meme coin",
@@ -96,51 +98,84 @@ ALTCOIN_KEYWORDS = {
     "밈코인",
 }
 
+# 광고/도박성 키워드
+AD_SPAM_KEYWORDS = {
+    "casino",
+    "casinos",
+    "betting",
+    "gambling",
+    "sportsbook",
+    "slot",
+    "jackpot",
+    "poker",
+    "promo code",
+    "bonus code",
+    "가입코드",
+    "추천코드",
+    "먹튀",
+}
 
-def _contains_keyword(text: str, keywords: set) -> bool:
-    """텍스트에 키워드가 포함되어 있는지 확인"""
-    text_lower = text.lower()
+ASCII_WORD_RE = re.compile(r"^[a-z0-9][a-z0-9\s\-]*$")
+
+
+def _keyword_hits(text: str, keywords: set[str]) -> Set[str]:
+    """텍스트 내 매칭된 키워드 집합 반환"""
+    normalized = f" {text.lower()} "
+    hits: set[str] = set()
+
     for kw in keywords:
-        if kw in text_lower:
-            return True
-    return False
+        key = kw.strip().lower()
+        if not key:
+            continue
+
+        if ASCII_WORD_RE.match(key):
+            pattern = rf"(?<![a-z0-9]){re.escape(key)}(?![a-z0-9])"
+            if re.search(pattern, normalized):
+                hits.add(key)
+            continue
+
+        if key in normalized:
+            hits.add(key)
+
+    return hits
 
 
-def is_bitcoin_related(title: str, summary: str, source_name: str) -> bool:
-    """비트코인 관련 기사인지 판별
-
-    Args:
-        title: 기사 제목
-        summary: 기사 요약
-        source_name: 소스 이름
-
-    Returns:
-        True이면 비트코인 관련 (통과), False이면 제외
-    """
-    # 비트코인 전용 소스는 무조건 통과
+def is_bitcoin_related(
+    title: str,
+    summary: str,
+    source_name: str,
+    source_ref: str = "",
+    url: str = "",
+) -> bool:
+    """규칙 기반 비트코인 기사 여부 판별"""
     if source_name in BITCOIN_ONLY_SOURCES:
         return True
 
-    combined = f"{title} {summary}"
+    combined = f"{title} {summary} {source_ref} {url}"
 
-    # 비트코인 키워드가 있으면 통과
-    if _contains_keyword(combined, BITCOIN_KEYWORDS):
-        return True
+    btc_hits = _keyword_hits(combined, BITCOIN_KEYWORDS)
+    alt_hits = _keyword_hits(combined, ALTCOIN_KEYWORDS)
+    ad_hits = _keyword_hits(combined, AD_SPAM_KEYWORDS)
 
-    # 비트코인 키워드 없이 알트코인 키워드만 있으면 제외
-    if _contains_keyword(combined, ALTCOIN_KEYWORDS):
+    # 광고/도박성 키워드는 즉시 제외
+    if ad_hits:
         return False
 
-    # 둘 다 없으면 일반 크립토/시장 뉴스로 통과 (crypto market, regulation 등)
+    # 비트코인 키워드가 없으면 제외
+    if not btc_hits:
+        return False
+
+    # 알트코인 신호가 비트코인보다 강하면 제외
+    if alt_hits and len(alt_hits) >= len(btc_hits):
+        return False
+
     return True
 
 
 class BitcoinFilterStage(PipelineStage):
-    """알트코인 전용 기사 필터링 (Do One Thing)"""
+    """규칙 기반 비트코인 기사 필터링 (Do One Thing)"""
 
     def process(self, context: PipelineContext) -> PipelineContext:
-        """비트코인 관련 기사만 통과"""
-        # 비트코인 전용 소스는 필터링 스킵
         if context.source_name in BITCOIN_ONLY_SOURCES:
             return context
 
@@ -149,19 +184,21 @@ class BitcoinFilterStage(PipelineStage):
         for item_data in context.items:
             title = item_data.get("title", "")
             summary = item_data.get("summary", "")
+            source_ref = item_data.get("source_ref", "")
+            url = item_data.get("url", "")
 
-            if is_bitcoin_related(title, summary, context.source_name):
+            if is_bitcoin_related(title, summary, context.source_name, source_ref, url):
                 new_items.append(item_data)
             else:
                 context.filtered += 1
                 logger.debug(
-                    f"[{context.source_name}] Filtered (altcoin): {title[:80]}"
+                    f"[{context.source_name}] Filtered (rules): {title[:80]}"
                 )
 
         if context.filtered > 0:
             logger.info(
                 f"[{context.source_name}] {len(new_items)} items passed "
-                f"(filtered {context.filtered} altcoin articles)"
+                f"(filtered {context.filtered} by rules)"
             )
 
         context.items = new_items

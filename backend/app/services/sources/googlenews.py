@@ -14,7 +14,13 @@ class GoogleNewsFetcher(BaseFetcher):
     """Google News RSS Fetcher"""
 
     source_name = "googlenews"
-    feed_url = "https://news.google.com/rss/search?q=bitcoin&hl=en-US&gl=US"
+    feed_url = (
+        "https://news.google.com/rss/search?"
+        "q=(bitcoin%20OR%20btc%20OR%20%22lightning%20network%22)"
+        "%20-ethereum%20-xrp%20-solana%20-nft%20-casino%20-betting"
+        "%20-gambling%20-airdrop"
+        "&hl=en-US&gl=US&ceid=US:en"
+    )
     category = "news"
 
     async def normalize(self, entry: dict) -> Optional[dict]:

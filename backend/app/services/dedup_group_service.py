@@ -20,6 +20,10 @@ class DedupGroupService:
     """제목 유사도 기반 그룹화 서비스"""
 
     WINDOW_HOURS = 24
+    SAME_DOMAIN_MIN_SCORE = 0.82
+    SAME_DOMAIN_MIN_OVERLAP = 3
+    CROSS_DOMAIN_MIN_SCORE = 0.90
+    CROSS_DOMAIN_MIN_OVERLAP = 5
 
     def __init__(self):
         self.similarity = SimilarityService()
@@ -38,7 +42,7 @@ class DedupGroupService:
         title = item_data.get("title", "")
         url = item_data.get("url", "")
         published_at = item_data.get("published_at") or datetime.utcnow()
-        domain = urlparse(url).netloc
+        domain = self._domain(url)
         cutoff = published_at - timedelta(hours=self.WINDOW_HOURS)
 
         if not title or not url:
@@ -64,8 +68,6 @@ class DedupGroupService:
         for candidate in candidates:
             if not candidate.title or not candidate.url:
                 continue
-            if urlparse(candidate.url).netloc != domain:
-                continue
 
             gid = self._get_group_id_from_item(candidate)
             if gid:
@@ -81,7 +83,11 @@ class DedupGroupService:
         best_group_id = None
         for gid, representative in group_representatives.items():
             rep_original_title = self._get_original_title_from_item(representative)
-            score = self._match_score(original_title, rep_original_title)
+            score = self._match_score(
+                original_title,
+                rep_original_title,
+                same_domain=(domain == self._domain(representative.url)),
+            )
             if score is not None and score > best_score:
                 best_score = score
                 best_group_id = gid
@@ -97,7 +103,11 @@ class DedupGroupService:
         # 2. 그룹 없는 아이템과 비교 (새 그룹 형성)
         for candidate in ungrouped_items:
             cand_original_title = self._get_original_title_from_item(candidate)
-            score = self._match_score(original_title, cand_original_title)
+            score = self._match_score(
+                original_title,
+                cand_original_title,
+                same_domain=(domain == self._domain(candidate.url)),
+            )
             if score is not None:
                 # 새 그룹 생성하고 둘 다 추가
                 new_group_id = self._create_group_id(item_data)
@@ -125,6 +135,8 @@ class DedupGroupService:
         # raw["title"]에 원본 영어 제목이 있음
         original = raw.get("title", "")
         if original:
+            if item_data.get("source") == "googlenews":
+                return self._strip_source_suffix(original)
             return original
         # fallback: 현재 제목 사용
         return item_data.get("title", "")
@@ -134,12 +146,32 @@ class DedupGroupService:
         raw = self._parse_raw(item.raw)
         original = raw.get("title", "")
         if original:
+            if item.source == "googlenews":
+                return self._strip_source_suffix(original)
             return original
         return item.title or ""
 
-    def _match_score(self, title_a: str, title_b: str) -> Optional[float]:
-        """SimilarityService를 사용하여 매칭 점수 계산"""
-        return self.similarity.match_score(title_a, title_b)
+    def _match_score(
+        self,
+        title_a: str,
+        title_b: str,
+        same_domain: bool,
+    ) -> Optional[float]:
+        """도메인별 임계값 + 토큰 겹침 수를 반영한 매칭 점수"""
+        score = self.similarity.match_score(title_a, title_b)
+        if score is None:
+            return None
+
+        overlap = self.similarity.token_overlap_count(title_a, title_b)
+        min_score = self.SAME_DOMAIN_MIN_SCORE if same_domain else self.CROSS_DOMAIN_MIN_SCORE
+        min_overlap = (
+            self.SAME_DOMAIN_MIN_OVERLAP if same_domain else self.CROSS_DOMAIN_MIN_OVERLAP
+        )
+
+        if score < min_score or overlap < min_overlap:
+            return None
+
+        return score
 
     def _get_group_id_from_item(self, item: FeedItem) -> Optional[str]:
         raw = self._parse_raw(item.raw)
@@ -178,3 +210,16 @@ class DedupGroupService:
     def _parse_raw(raw_value: Optional[str]) -> dict:
         """JSON 문자열을 안전하게 파싱"""
         return safe_parse_json(raw_value, {})
+
+    @staticmethod
+    def _domain(url: str) -> str:
+        return urlparse(url).netloc.lower() if url else ""
+
+    @staticmethod
+    def _strip_source_suffix(title: str) -> str:
+        """Google News 원본 제목의 '- Source' 접미사 제거"""
+        if " - " in title:
+            parts = title.rsplit(" - ", 1)
+            if len(parts) == 2 and parts[0].strip():
+                return parts[0].strip()
+        return title

@@ -44,17 +44,24 @@ class SimilarityService:
 
     def normalize_title(self, title: str) -> list[str]:
         """제목을 정규화하여 토큰 리스트로 변환"""
-        tokens = re.split(r"[^a-z0-9]+", title.lower())
+        # 영어/숫자 + 한글 토큰 모두 지원
+        tokens = re.findall(r"[a-z0-9]+|[가-힣]+", title.lower())
         return [
             token for token in tokens
             if token and token not in self.STOPWORDS and len(token) >= 2
         ]
 
+    def token_overlap_count(self, title_a: str, title_b: str) -> int:
+        """두 제목 간 공통 토큰 수"""
+        tokens_a = set(self.normalize_title(title_a))
+        tokens_b = set(self.normalize_title(title_b))
+        return len(tokens_a & tokens_b)
+
     @staticmethod
     def jaccard_similarity(tokens_a: list[str], tokens_b: list[str]) -> float:
         """Jaccard 유사도 계산"""
         if not tokens_a and not tokens_b:
-            return 1.0
+            return 0.0
         if not tokens_a or not tokens_b:
             return 0.0
 
