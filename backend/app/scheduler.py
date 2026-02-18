@@ -9,9 +9,11 @@ from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.database import SessionLocal
+from app.models.feed_item import FeedItem
 from app.scheduler_state import scheduler_state
 from app.services.fetch_engine import FetchEngine
 from app.services.market_data_service import update_market_data
+from app.services.translate_service import TranslateService
 from app.utils.cache import cache
 
 logger = logging.getLogger(__name__)
@@ -57,6 +59,63 @@ async def _progress_callback(data: dict):
     logger.debug(f"[Scheduler] Progress update: {data}")
 
 
+async def retranslate_failed_items():
+    """DB에서 번역 실패 항목을 재번역"""
+    db = SessionLocal()
+    try:
+        failed_items = (
+            db.query(FeedItem)
+            .filter(FeedItem.translation_status == "failed")
+            .limit(50)
+            .all()
+        )
+
+        if not failed_items:
+            logger.debug("[Scheduler] No failed translation items to retranslate")
+            return
+
+        logger.info(f"[Scheduler] Retranslating {len(failed_items)} failed items...")
+
+        translator = TranslateService()
+        if not translator.client:
+            logger.warning("[Scheduler] Retranslation skipped - no API key")
+            return
+
+        batch = [
+            {"id": item.id, "title": item.title, "summary": item.summary or ""}
+            for item in failed_items
+        ]
+
+        translated = translator.translate_batch_sync(batch)
+
+        success_count = 0
+        for translated_item in translated:
+            if translated_item.get("_translated", False):
+                db_item = db.query(FeedItem).filter(FeedItem.id == translated_item["id"]).first()
+                if db_item:
+                    db_item.title = translated_item["title"]
+                    db_item.summary = translated_item["summary"]
+                    db_item.translation_status = "ok"
+                    success_count += 1
+
+        db.commit()
+
+        fail_count = len(failed_items) - success_count
+        logger.info(
+            f"[Scheduler] Retranslation complete - "
+            f"Success: {success_count}, Still failed: {fail_count}"
+        )
+
+        if success_count > 0:
+            cache.clear()
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Scheduler] Retranslation failed: {e}", exc_info=True)
+    finally:
+        db.close()
+
+
 async def scheduled_fetch():
     """스케줄된 RSS 수집 작업"""
     logger.info("[Scheduler] Starting scheduled RSS fetch...")
@@ -90,6 +149,10 @@ async def scheduled_fetch():
             f"Saved: {result['total_saved']}, "
             f"Duplicates: {result['total_duplicates']}"
         )
+
+        # 수집 완료 후 번역 실패 항목 재번역
+        await retranslate_failed_items()
+
     except Exception as e:
         logger.error(f"[Scheduler] Fetch failed: {e}", exc_info=True)
         scheduler_state.mark_idle()

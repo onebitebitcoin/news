@@ -46,6 +46,32 @@ class TranslateStage(PipelineStage):
                 item["translation_status"] = "failed"
             return context
 
+        # 실패 아이템 개별 재시도
+        failed_items = [
+            item for item in context.items
+            if not item.get("_translated", False)
+        ]
+
+        if failed_items:
+            logger.info(
+                f"[{context.source_name}] {len(failed_items)} items failed batch translation, "
+                f"retrying individually..."
+            )
+            for item_data in failed_items:
+                try:
+                    self.translator.translate_single_item(item_data)
+                    if item_data.get("_translated", False):
+                        logger.info(
+                            f"[{context.source_name}] Individual retry succeeded: "
+                            f"{item_data.get('id', 'unknown')}"
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"[{context.source_name}] Individual retry failed for "
+                        f"{item_data.get('id', 'unknown')}: {e}"
+                    )
+                    item_data["_translated"] = False
+
         # 번역 상태 반영 (실패 시 fail-open으로 원문 유지)
         for item_data in context.items:
             if not item_data.get("_translated", False):

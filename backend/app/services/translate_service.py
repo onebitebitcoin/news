@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import time
 
 from openai import OpenAI
 
@@ -15,6 +16,10 @@ class TranslateService:
 
     # 배치 번역 시 최대 아이템 수 (토큰 제한 고려)
     BATCH_SIZE = 15
+
+    # 재시도 설정
+    MAX_RETRIES = 3
+    RETRY_BASE_DELAY = 2  # seconds
 
     # 한글 유니코드 범위 정규식
     KOREAN_PATTERN = re.compile(r"[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]")
@@ -173,43 +178,72 @@ class TranslateService:
 
         return all_translated
 
+    def translate_single_item(self, item: dict) -> dict:
+        """단일 아이템 번역 (배치 실패 후 개별 재시도용)
+
+        Args:
+            item: {"id": ..., "title": ..., "summary": ...}
+
+        Returns:
+            _translated 플래그가 포함된 아이템
+        """
+        title = item.get("title", "")
+        summary = item.get("summary", "")
+
+        translated_title, translated_summary = self.translate_to_korean(title, summary)
+        item["title"] = translated_title
+        item["summary"] = translated_summary
+        item["_translated"] = self.is_korean_text(translated_title)
+
+        return item
+
     def _translate_single_batch(self, batch: list[dict]) -> list[dict]:
-        """단일 배치 번역 (한 번의 API 호출)"""
-        try:
-            # 배치 프롬프트 생성
-            prompt = self._build_batch_prompt(batch)
+        """단일 배치 번역 (한 번의 API 호출, 최대 3회 재시도)"""
+        last_error = None
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a professional translator specializing in "
-                            "cryptocurrency and Bitcoin news. Translate the given "
-                            "English texts to Korean. Keep technical terms in English "
-                            "if commonly used (e.g., Bitcoin, ETF, Lightning Network). "
-                            "Be concise and natural. "
-                            "IMPORTANT: Return ONLY valid JSON array, no other text."
-                        )
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                max_completion_tokens=4000,
-            )
+        for attempt in range(1, self.MAX_RETRIES + 1):
+            try:
+                prompt = self._build_batch_prompt(batch)
 
-            result = response.choices[0].message.content
-            return self._parse_batch_response(result, batch)
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are a professional translator specializing in "
+                                "cryptocurrency and Bitcoin news. Translate the given "
+                                "English texts to Korean. Keep technical terms in English "
+                                "if commonly used (e.g., Bitcoin, ETF, Lightning Network). "
+                                "Be concise and natural. "
+                                "IMPORTANT: Return ONLY valid JSON array, no other text."
+                            )
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    max_completion_tokens=4000,
+                )
 
-        except Exception as e:
-            logger.error(f"Batch translation failed: {e}")
-            # 실패 시 번역 실패로 마킹
-            for item in batch:
-                item["_translated"] = False
-            return batch
+                result = response.choices[0].message.content
+                return self._parse_batch_response(result, batch)
+
+            except Exception as e:
+                last_error = e
+                if attempt < self.MAX_RETRIES:
+                    delay = self.RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                    logger.warning(
+                        f"Batch translation attempt {attempt}/{self.MAX_RETRIES} failed: {e}. "
+                        f"Retrying in {delay}s..."
+                    )
+                    time.sleep(delay)
+
+        logger.error(f"Batch translation failed after {self.MAX_RETRIES} attempts: {last_error}")
+        for item in batch:
+            item["_translated"] = False
+        return batch
 
     def _build_batch_prompt(self, items: list[dict]) -> str:
         """배치 번역 프롬프트 생성"""

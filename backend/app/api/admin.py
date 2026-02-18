@@ -22,6 +22,7 @@ from app.schemas.api_key import (
 )
 from app.schemas.common import ApiResponse
 from app.services.fetch_engine import FetchEngine
+from app.services.translate_service import TranslateService
 
 logger = logging.getLogger(__name__)
 
@@ -351,3 +352,97 @@ async def delete_api_key(
             detail={"message": f"API 키를 찾을 수 없습니다: {key_id}"},
         )
     return ok({"message": "API 키가 삭제되었습니다."})
+
+
+# === Retranslation ===
+
+class RetranslateResponse(BaseModel):
+    """재번역 결과"""
+    success: bool
+    total_failed: int
+    retranslated: int
+    still_failed: int
+    message: str
+
+
+@router.post("/retranslate", response_model=ApiResponse[RetranslateResponse])
+async def retranslate_failed(db: Session = Depends(get_db)):
+    """
+    번역 실패 항목 수동 재번역
+
+    translation_status가 'failed'인 항목들을 재번역합니다.
+    최대 50개씩 처리합니다.
+    """
+    logger.info("[Admin] Retranslation triggered")
+
+    try:
+        failed_items = (
+            db.query(FeedItem)
+            .filter(FeedItem.translation_status == "failed")
+            .limit(50)
+            .all()
+        )
+
+        if not failed_items:
+            return ok(RetranslateResponse(
+                success=True,
+                total_failed=0,
+                retranslated=0,
+                still_failed=0,
+                message="재번역할 항목이 없습니다.",
+            ))
+
+        translator = TranslateService()
+        if not translator.client:
+            raise HTTPException(
+                status_code=500,
+                detail={"message": "OPENAI_API_KEY가 설정되지 않았습니다."},
+            )
+
+        batch = [
+            {"id": item.id, "title": item.title, "summary": item.summary or ""}
+            for item in failed_items
+        ]
+
+        translated = translator.translate_batch_sync(batch)
+
+        success_count = 0
+        for translated_item in translated:
+            if translated_item.get("_translated", False):
+                db_item = db.query(FeedItem).filter(
+                    FeedItem.id == translated_item["id"]
+                ).first()
+                if db_item:
+                    db_item.title = translated_item["title"]
+                    db_item.summary = translated_item["summary"]
+                    db_item.translation_status = "ok"
+                    success_count += 1
+
+        db.commit()
+
+        still_failed = len(failed_items) - success_count
+        logger.info(
+            f"[Admin] Retranslation complete - "
+            f"Success: {success_count}, Still failed: {still_failed}"
+        )
+
+        return ok(RetranslateResponse(
+            success=True,
+            total_failed=len(failed_items),
+            retranslated=success_count,
+            still_failed=still_failed,
+            message=f"{success_count}개 항목이 재번역되었습니다.",
+        ))
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Admin] Retranslation failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "재번역 중 오류 발생",
+                "error": str(e),
+            }
+        )
