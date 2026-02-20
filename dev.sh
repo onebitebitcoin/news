@@ -29,6 +29,26 @@ error() {
     echo -e "${RED}✗${NC} $1"
 }
 
+# 함수: .env 로드 (공백/특수문자 포함 값 안전 처리)
+load_env_file() {
+    if [ -f ".env" ]; then
+        set -a
+        # shellcheck disable=SC1091
+        source .env
+        set +a
+        success ".env 로드 완료"
+
+        if [ -z "${OPENAI_API_KEY:-}" ]; then
+            info "OPENAI_API_KEY 미설정: 번역 기능이 비활성화될 수 있습니다."
+        else
+            success "OPENAI_API_KEY 로드 확인"
+        fi
+    else
+        error ".env 파일이 없습니다. 먼저 ./install.sh를 실행하세요."
+        exit 1
+    fi
+}
+
 # 함수: 서버 종료
 cleanup() {
     echo ""
@@ -91,11 +111,6 @@ start_backend() {
 
     source venv/bin/activate
 
-    # .env 파일 로드
-    if [ -f ".env" ]; then
-        export $(grep -v '^#' .env | xargs)
-    fi
-
     cd backend
 
     # Uvicorn으로 FastAPI 서버 시작
@@ -141,12 +156,14 @@ MODE=${1:-"all"}
 
 case $MODE in
     "backend")
+        load_env_file
         start_backend
         ;;
     "frontend")
         start_frontend
         ;;
     "all"|*)
+        load_env_file
         start_backend
         echo ""
         sleep 2  # 백엔드 시작 대기
