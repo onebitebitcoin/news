@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.response import ok
+from app.config import settings
 from app.database import get_db
 from app.models.feed_item import FeedItem
 from app.schemas.common import ApiResponse
@@ -29,10 +30,53 @@ from app.services.dedup_service import DedupService
 from app.services.feed_service import FeedService
 from app.services.search_service import SearchService
 from app.services.sources.base_fetcher import BaseFetcher
+from app.services.translate_service import TranslateService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _to_translation_http_error(message: str, error: str, status: str) -> HTTPException:
+    return HTTPException(
+        status_code=422,
+        detail={
+            "message": message,
+            "error": error,
+            "type": "TranslationRequiredError",
+            "translation_status": status,
+        },
+    )
+
+
+def _translate_manual_article_or_raise(
+    title: str,
+    summary: Optional[str],
+    translator: Optional[TranslateService] = None,
+) -> tuple[str, Optional[str], str]:
+    if TranslateService.is_korean_text(title):
+        return title, summary, "skipped"
+
+    active_translator = translator or TranslateService()
+    if settings.TRANSLATION_REQUIRED and not active_translator.client:
+        raise _to_translation_http_error(
+            message="영문 기사는 번역이 필수이지만 OPENAI_API_KEY가 설정되지 않았습니다.",
+            error="OPENAI_API_KEY is missing",
+            status="failed",
+        )
+
+    translated_title, translated_summary = active_translator.translate_to_korean(
+        title=title,
+        summary=summary or "",
+    )
+    if not TranslateService.is_korean_text(translated_title):
+        raise _to_translation_http_error(
+            message="영문 기사 번역에 실패했습니다. 한글 제목이 필요합니다.",
+            error="translated title does not contain Korean text",
+            status="failed",
+        )
+
+    return translated_title, translated_summary, "ok"
 
 
 @router.get("/feed", response_model=ApiResponse[FeedListResponse])
@@ -267,6 +311,7 @@ async def create_manual_batch(
     results: List[BatchManualResult] = []
     added = 0
     skipped = 0
+    translator: Optional[TranslateService] = None
 
     for article in body.articles:
         url = str(article.url)
@@ -280,25 +325,41 @@ async def create_manual_batch(
                 skipped += 1
                 continue
 
+            if translator is None and not TranslateService.is_korean_text(article.title):
+                translator = TranslateService()
+
+            translated_title, translated_summary, translation_status = _translate_manual_article_or_raise(
+                title=article.title,
+                summary=article.summary,
+                translator=translator,
+            )
+
             now = datetime.now(timezone.utc)
             published_at = article.published_at or now
             item = FeedItem(
                 id=str(uuid.uuid4()),
                 source="manual",
-                title=article.title,
-                summary=article.summary,
+                title=translated_title,
+                summary=translated_summary,
                 url=url,
                 image_url=str(article.image_url) if article.image_url else None,
                 published_at=published_at,
                 fetched_at=now,
                 url_hash=url_hash,
                 score=0,
-                translation_status="skipped",
+                translation_status=translation_status,
             )
             db.add(item)
             db.flush()
             results.append(BatchManualResult(url=url, success=True, id=item.id))
             added += 1
+        except HTTPException as e:
+            detail = e.detail if isinstance(e.detail, dict) else {"message": str(e.detail)}
+            logger.warning(f"일괄 추가 번역 실패: url={url}, detail={detail}")
+            results.append(BatchManualResult(
+                url=url, success=False, error=detail.get("message", "번역 실패"),
+            ))
+            skipped += 1
         except Exception as e:
             logger.error(f"일괄 추가 개별 실패: url={url}, error={e}")
             results.append(BatchManualResult(
@@ -352,18 +413,26 @@ async def create_manual_article(
 
         now = datetime.now(timezone.utc)
         published_at = body.published_at or now
+        translator = None
+        if not TranslateService.is_korean_text(body.title):
+            translator = TranslateService()
+        translated_title, translated_summary, translation_status = _translate_manual_article_or_raise(
+            title=body.title,
+            summary=body.summary,
+            translator=translator,
+        )
         item = FeedItem(
             id=str(uuid.uuid4()),
             source="manual",
-            title=body.title,
-            summary=body.summary,
+            title=translated_title,
+            summary=translated_summary,
             url=url,
             image_url=str(body.image_url) if body.image_url else None,
             published_at=published_at,
             fetched_at=now,
             url_hash=url_hash,
             score=0,
-            translation_status="skipped",
+            translation_status=translation_status,
         )
         db.add(item)
         db.commit()

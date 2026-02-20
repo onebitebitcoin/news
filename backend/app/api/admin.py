@@ -53,6 +53,9 @@ class SourceResult(BaseModel):
     fetched: int
     saved: int
     duplicates: int
+    filtered: int = 0
+    translation_failed: int = 0
+    translation_dropped: int = 0
     error: Optional[str] = None
 
 
@@ -62,6 +65,9 @@ class FetchResult(BaseModel):
     total_fetched: int
     total_saved: int
     total_duplicates: int
+    total_filtered: int = 0
+    total_translation_failed: int = 0
+    total_translation_dropped: int = 0
     sources: dict[str, SourceResult]
     started_at: str
     finished_at: Optional[str] = None

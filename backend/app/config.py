@@ -19,6 +19,8 @@ class Settings(BaseSettings):
 
     # 보안
     SECRET_KEY: str = "dev-secret-key-change-in-production"
+    OPENAI_API_KEY: str = ""
+    TRANSLATION_REQUIRED: bool = True
 
     # CORS
     CORS_ORIGINS: list[str] = ["http://localhost:6200", "http://localhost:5173"]

@@ -2,11 +2,13 @@
 
 import asyncio
 import logging
+import os
 from datetime import datetime
 from typing import Callable, Dict, List, Optional, Type
 
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.source_status import SourceStatus
 from app.services.pipeline import (
     BitcoinFilterStage,
@@ -68,9 +70,21 @@ class FetchEngine:
         self.db = db
         self.hours_limit = hours_limit
         self.translate = translate
+        self.translation_required = settings.TRANSLATION_REQUIRED
+        self.is_testing = os.getenv("TESTING", "").lower() == "true"
 
         # Pipeline stages 초기화
         translator = TranslateService() if translate else None
+        if (
+            translate
+            and self.translation_required
+            and not self.is_testing
+            and (not translator or not translator.client)
+        ):
+            raise ValueError(
+                "OPENAI_API_KEY is required when TRANSLATION_REQUIRED is enabled"
+            )
+
         self.stages = [
             DedupStage(),
             BitcoinFilterStage(),
@@ -100,6 +114,7 @@ class FetchEngine:
             "total_duplicates": 0,
             "total_filtered": 0,
             "total_translation_failed": 0,
+            "total_translation_dropped": 0,
             "sources": {},
             "started_at": datetime.utcnow().isoformat(),
             "finished_at": None,
@@ -150,6 +165,7 @@ class FetchEngine:
             results["total_duplicates"] += source_result["duplicates"]
             results["total_filtered"] += source_result.get("filtered", 0)
             results["total_translation_failed"] += source_result.get("translation_failed", 0)
+            results["total_translation_dropped"] += source_result.get("translation_dropped", 0)
 
             if not source_result["success"]:
                 results["success"] = False
@@ -170,7 +186,8 @@ class FetchEngine:
             f"Saved: {results['total_saved']}, "
             f"Duplicates: {results['total_duplicates']}, "
             f"Filtered: {results['total_filtered']}, "
-            f"TranslationFailed: {results['total_translation_failed']} ==="
+            f"TranslationFailed: {results['total_translation_failed']}, "
+            f"TranslationDropped: {results['total_translation_dropped']} ==="
         )
 
         return results
@@ -189,6 +206,7 @@ class FetchEngine:
             "duplicates": 0,
             "filtered": 0,
             "translation_failed": 0,
+            "translation_dropped": 0,
             "error": fetch_error,
         }
 
@@ -204,6 +222,7 @@ class FetchEngine:
                 source_name=source_name,
                 items=items,
                 fetched=len(items),
+                translation_required=self.translation_required,
             )
 
             for stage in self.stages:
@@ -217,6 +236,7 @@ class FetchEngine:
             result["duplicates"] = context.duplicates
             result["filtered"] = context.filtered
             result["translation_failed"] = context.translation_failed
+            result["translation_dropped"] = context.translation_dropped
             result["saved"] = context.saved
 
             # 상태 업데이트
@@ -253,6 +273,7 @@ class FetchEngine:
                 "saved": 0,
                 "duplicates": 0,
                 "translation_failed": 0,
+                "translation_dropped": 0,
                 "error": error_msg,
             }
 

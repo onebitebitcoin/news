@@ -104,22 +104,18 @@ class TranslateService:
 
     def _build_prompt(self, title: str, summary: str) -> str:
         """단일 아이템 번역 프롬프트 생성"""
-        if summary:
-            return (
-                f"Translate the following Bitcoin news to Korean.\n\n"
-                f"Title: {title}\n"
-                f"Summary: {summary}\n\n"
-                f"Response format:\n"
-                f"TITLE: [Korean title]\n"
-                f"SUMMARY: [Korean summary]"
-            )
-        else:
-            return (
-                f"Translate the following Bitcoin news title to Korean.\n\n"
-                f"Title: {title}\n\n"
-                f"Response format:\n"
-                f"TITLE: [Korean title]"
-            )
+        payload = {
+            "title": title,
+            "summary": summary,
+        }
+        return (
+            "Translate the following Bitcoin news to Korean.\n\n"
+            "Input (JSON):\n"
+            f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n\n"
+            "Output (JSON):\n"
+            '{ "title": "Korean title", "summary": "Korean summary" }\n\n'
+            "IMPORTANT: Return ONLY JSON."
+        )
 
     def _parse_response(
         self,
@@ -131,13 +127,43 @@ class TranslateService:
         translated_title = original_title
         translated_summary = original_summary
 
+        cleaned = response.strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.split("\n")
+            if len(lines) >= 3:
+                cleaned = "\n".join(lines[1:-1]).strip()
+
+        # JSON 응답 우선 파싱
+        try:
+            data = json.loads(cleaned)
+            if isinstance(data, list) and data:
+                data = data[0]
+            if isinstance(data, dict):
+                title_val = data.get("title")
+                summary_val = data.get("summary")
+                if isinstance(title_val, str) and title_val.strip():
+                    translated_title = title_val.strip()
+                if isinstance(summary_val, str):
+                    translated_summary = summary_val.strip()
+                return translated_title, translated_summary
+        except json.JSONDecodeError:
+            pass
+
         lines = response.strip().split("\n")
         for line in lines:
             line = line.strip()
-            if line.startswith("TITLE:"):
-                translated_title = line[6:].strip()
-            elif line.startswith("SUMMARY:"):
-                translated_summary = line[8:].strip()
+            if line.startswith("TITLE:") or line.startswith("제목:"):
+                translated_title = line.split(":", 1)[1].strip()
+            elif line.startswith("SUMMARY:") or line.startswith("요약:"):
+                translated_summary = line.split(":", 1)[1].strip()
+
+        # 비정형 응답 fallback: 첫 줄 제목, 나머지 요약
+        if translated_title == original_title and lines:
+            first_line = lines[0].strip()
+            if first_line:
+                translated_title = first_line
+            if original_summary and len(lines) > 1:
+                translated_summary = " ".join(line.strip() for line in lines[1:] if line.strip())
 
         return translated_title, translated_summary
 

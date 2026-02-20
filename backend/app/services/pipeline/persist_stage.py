@@ -17,6 +17,13 @@ class PersistStage(PipelineStage):
         """아이템들을 DB에 저장"""
         failed = 0
         for item_data in context.items:
+            if context.translation_required and item_data.get("translation_status") == "failed":
+                context.translation_dropped += 1
+                logger.warning(
+                    f"[{context.source_name}] Dropped untranslated item: "
+                    f"{item_data.get('id', 'unknown')}"
+                )
+                continue
             try:
                 with context.db.begin_nested():
                     self._save_item(context.db, item_data)
@@ -33,6 +40,11 @@ class PersistStage(PipelineStage):
 
         if failed > 0:
             logger.warning(f"[{context.source_name}] Save failures: {failed}")
+        if context.translation_dropped > 0:
+            logger.warning(
+                f"[{context.source_name}] Translation policy dropped: "
+                f"{context.translation_dropped}"
+            )
 
         return context
 

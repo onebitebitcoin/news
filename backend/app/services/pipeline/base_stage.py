@@ -20,7 +20,9 @@ class PipelineContext:
     duplicates: int = 0
     filtered: int = 0
     translation_failed: int = 0
+    translation_dropped: int = 0
     saved: int = 0
+    translation_required: bool = True
 
 
 class PipelineStage(ABC):

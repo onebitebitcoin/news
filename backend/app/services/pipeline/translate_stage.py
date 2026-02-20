@@ -9,9 +9,6 @@ from app.services.translate_service import TranslateService
 
 logger = logging.getLogger(__name__)
 
-# 한국어 소스 목록 (번역 불필요)
-KOREAN_SOURCES = {"coindeskkorea", "blockmedia", "tokenpost"}
-
 
 class TranslateStage(PipelineStage):
     """배치 번역 처리 (Do One Thing)"""
@@ -21,34 +18,48 @@ class TranslateStage(PipelineStage):
 
     async def process(self, context: PipelineContext) -> PipelineContext:
         """배치 번역 실행"""
-        if not self.translator or not context.items:
+        if not context.items:
             return context
 
-        # 한국어 소스는 번역 스킵 (이미 한국어)
-        if context.source_name in KOREAN_SOURCES:
-            logger.info(f"[{context.source_name}] 한국어 소스 - 번역 스킵")
-            for item in context.items:
-                item["title_ko"] = item["title"]
-                item["summary_ko"] = item.get("summary", "")
+        # 한글 제목은 번역 스킵, 비한글 제목만 번역 대상
+        needs_translation = []
+        for item in context.items:
+            title = item.get("title", "")
+            if TranslateService.is_korean_text(title):
                 item["_translated"] = True
                 item["translation_status"] = "skipped"
+            else:
+                needs_translation.append(item)
+
+        if not needs_translation:
+            return context
+
+        if not self.translator or not self.translator.client:
+            logger.warning(
+                f"[{context.source_name}] Translation unavailable: "
+                f"{len(needs_translation)} non-Korean items"
+            )
+            for item in needs_translation:
+                item["_translated"] = False
+                item["translation_status"] = "failed"
+            context.translation_failed += len(needs_translation)
             return context
 
         try:
-            context.items = await asyncio.to_thread(
-                self.translator.translate_batch_sync, context.items
+            translated_items = await asyncio.to_thread(
+                self.translator.translate_batch_sync, needs_translation
             )
         except Exception as e:
             logger.error(f"[{context.source_name}] Batch translation error: {e}")
-            context.translation_failed = len(context.items)
-            for item in context.items:
+            for item in needs_translation:
                 item["_translated"] = False
                 item["translation_status"] = "failed"
+            context.translation_failed += len(needs_translation)
             return context
 
         # 실패 아이템 개별 재시도
         failed_items = [
-            item for item in context.items
+            item for item in translated_items
             if not item.get("_translated", False)
         ]
 
@@ -73,20 +84,17 @@ class TranslateStage(PipelineStage):
                     item_data["_translated"] = False
 
         # 번역 상태 반영 (실패 시 fail-open으로 원문 유지)
-        for item_data in context.items:
+        for item_data in translated_items:
             if not item_data.get("_translated", False):
                 context.translation_failed += 1
                 item_data["translation_status"] = "failed"
-                logger.debug(
-                    f"[{context.source_name}] Keeping untranslated item: "
-                    f"{item_data.get('id', 'unknown')}"
-                )
             else:
                 item_data["translation_status"] = "ok"
 
         if context.translation_failed > 0:
+            message = "will be dropped" if context.translation_required else "will be kept"
             logger.warning(
-                f"[{context.source_name}] {context.translation_failed} items kept in original language "
-                f"due to translation failure"
+                f"[{context.source_name}] {context.translation_failed} translation failures "
+                f"({message})"
             )
         return context
