@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     # 보안
     SECRET_KEY: str = "dev-secret-key-change-in-production"
     OPENAI_API_KEY: str = ""
+    RESEARCHBITCOIN_API_TOKEN: str = ""
     TRANSLATION_REQUIRED: bool = True
 
     # CORS

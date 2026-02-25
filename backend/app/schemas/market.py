@@ -78,6 +78,7 @@ class MarketDataResponse(BaseModel):
     kimchi_premium: Optional[float] = None
     fee_rates: Optional[FeeRates] = None
     fear_greed_index: Optional[FearGreedIndex] = None
+    mvrv_z_score: Optional[float] = None
     difficulty_adjustment: Optional[DifficultyAdjustment] = None
     hashrate: Optional[HashRate] = None
     mempool_stats: Optional[MempoolStats] = None
@@ -95,6 +96,7 @@ class MarketDataDaily(BaseModel):
     kimchi_premium: Optional[float] = None
     fee_rates: Optional[FeeRates] = None
     fear_greed_index: Optional[FearGreedIndex] = None
+    mvrv_z_score: Optional[float] = None
     difficulty_adjustment: Optional[DifficultyAdjustment] = None
     hashrate: Optional[HashRate] = None
     mempool_stats: Optional[MempoolStats] = None

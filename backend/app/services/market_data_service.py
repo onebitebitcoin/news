@@ -6,6 +6,7 @@ from typing import Any, Callable, Coroutine
 
 import httpx
 
+from app.config import settings
 from app.database import SessionLocal
 from app.market_data_state import market_data_state
 from app.models.market_data_snapshot import MarketDataSnapshot
@@ -164,6 +165,44 @@ async def fetch_fear_greed_index(client: httpx.AsyncClient) -> dict:
     }
 
 
+async def fetch_mvrv_z_score(client: httpx.AsyncClient) -> float:
+    """ResearchBitcoin API에서 MVRV Z-Score 조회"""
+    token = settings.RESEARCHBITCOIN_API_TOKEN.strip()
+    if not token:
+        raise RuntimeError("RESEARCHBITCOIN_API_TOKEN is not configured")
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-API-Key": token,
+    }
+    resp = await client.get(
+        "https://api.researchbitcoin.net/api/v1/metrics/timeseries",
+        params={
+            "metric_category": "onchain_valuation",
+            "metrics": "market_value_to_realized_value",
+            "data_fields": "mvrv_z_score",
+            "interval": "10m",
+            "limit": 1,
+        },
+        headers=headers,
+    )
+    resp.raise_for_status()
+    payload = resp.json()
+    rows = payload.get("data") or []
+    if not rows:
+        raise ValueError("ResearchBitcoin response has no data rows")
+
+    values = rows[0].get("values") or []
+    if not values:
+        raise ValueError("ResearchBitcoin response has no values")
+
+    for item in values:
+        if item.get("data_field") == "mvrv_z_score":
+            return float(item["value"])
+
+    raise ValueError("mvrv_z_score not found in ResearchBitcoin response")
+
+
 def calculate_kimchi_premium(
     upbit_krw: float, binance_usd: float, usd_krw: float
 ) -> float:
@@ -228,6 +267,13 @@ async def update_market_data() -> None:
             fetch_fear_greed_index, "fear_greed_index", "fear_greed", "Fear & Greed", client
         )
         await _safe_fetch(
+            fetch_mvrv_z_score,
+            "mvrv_z_score",
+            "mvrv_z_score",
+            "MVRV Z-Score",
+            client,
+        )
+        await _safe_fetch(
             fetch_difficulty_adjustment, "difficulty_adjustment", "difficulty_adjustment",
             "Difficulty adjustment", client
         )
@@ -284,6 +330,7 @@ def save_daily_snapshot(data: dict) -> None:
             fee_rates=data.get("fee_rates"),
             fear_greed_value=fng_data["value"] if fng_data else None,
             fear_greed_classification=fng_data["classification"] if fng_data else None,
+            mvrv_z_score=data.get("mvrv_z_score"),
             difficulty_adjustment=data.get("difficulty_adjustment"),
             hashrate_data=data.get("hashrate"),
             mempool_stats=data.get("mempool_stats"),

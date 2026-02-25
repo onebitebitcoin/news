@@ -20,6 +20,7 @@ class MarketDataSnapshot(Base):
     fee_rates = Column(JSON, nullable=True)
     fear_greed_value = Column(Integer, nullable=True)
     fear_greed_classification = Column(String, nullable=True)
+    mvrv_z_score = Column(Float, nullable=True)
     difficulty_adjustment = Column(JSON, nullable=True)
     hashrate_data = Column(JSON, nullable=True)
     mempool_stats = Column(JSON, nullable=True)
