@@ -5,6 +5,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from app.repositories.bookmark_repository import BookmarkRepository
+from app.repositories.custom_source_repository import CustomSourceRepository
 from app.repositories.feed_repository import FeedRepository
 from app.schemas.feed import FeedItemDetail, FeedItemDuplicate, FeedItemResponse, FeedListResponse
 from app.utils.cache import cache
@@ -20,8 +21,10 @@ class FeedService:
     NEW_ITEM_HOURS = 3
 
     def __init__(self, db: Session):
+        self.db = db
         self.feed_repo = FeedRepository(db)
         self.bookmark_repo = BookmarkRepository(db)
+        self.custom_source_repo = CustomSourceRepository(db)
 
     def _is_new_item(self, fetched_at: datetime) -> bool:
         """최근 수집된 아이템인지 확인"""
@@ -123,7 +126,9 @@ class FeedService:
         if cached is not None:
             return cached
 
-        result = self.feed_repo.get_sources()
+        db_sources = self.feed_repo.get_sources()
+        custom_sources = self.custom_source_repo.active_slugs()
+        result = sorted(set([*db_sources, *custom_sources]), key=lambda v: v.lower())
         cache.set("sources", result, ttl=300)
         return result
 

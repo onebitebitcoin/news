@@ -101,6 +101,36 @@ export const adminApi = {
     const { data } = await client.delete(`/admin/api-keys/${keyId}`)
     return data
   },
+
+  analyzeCustomSource: async (payload) => {
+    const { data } = await client.post('/admin/custom-sources/analyze', payload)
+    return data
+  },
+
+  getCustomSources: async () => {
+    const { data } = await client.get('/admin/custom-sources')
+    return data
+  },
+
+  createCustomSource: async (payload) => {
+    const { data } = await client.post('/admin/custom-sources', payload)
+    return data
+  },
+
+  updateCustomSource: async (sourceId, payload) => {
+    const { data } = await client.patch(`/admin/custom-sources/${sourceId}`, payload)
+    return data
+  },
+
+  deleteCustomSource: async (sourceId) => {
+    const { data } = await client.delete(`/admin/custom-sources/${sourceId}`)
+    return data
+  },
+
+  reanalyzeCustomSource: async (sourceId) => {
+    const { data } = await client.post(`/admin/custom-sources/${sourceId}/reanalyze`)
+    return data
+  },
 }
 
 export const marketApi = {

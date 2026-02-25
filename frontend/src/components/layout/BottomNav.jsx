@@ -5,7 +5,7 @@ const navItems = [
   { to: '/', icon: Newspaper, label: 'News' },
   { to: '/dashboard', icon: BarChart3, label: 'Data' },
   { to: '/bookmarks', icon: Bookmark, label: 'Saved' },
-  { to: '/settings/api-keys', icon: Settings, label: 'Settings' },
+  { to: '/settings/sources', icon: Settings, label: 'Settings' },
 ]
 
 export default function BottomNav() {

@@ -4,8 +4,10 @@ import json
 import logging
 from typing import List, Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.response import ok
@@ -13,6 +15,7 @@ from app.database import get_db
 from app.models.feed_item import FeedItem
 from app.models.source_status import SourceStatus
 from app.repositories.api_key_repository import ApiKeyRepository
+from app.repositories.custom_source_repository import CustomSourceRepository
 from app.scheduler import get_fetch_progress, get_scheduler_status
 from app.schemas.api_key import (
     ApiKeyCreate,
@@ -21,8 +24,21 @@ from app.schemas.api_key import (
     ApiKeyResponse,
 )
 from app.schemas.common import ApiResponse
+from app.schemas.custom_source import (
+    CustomSourceAnalyzeRequest,
+    CustomSourceAnalyzeResponse,
+    CustomSourceCreate,
+    CustomSourceListResponse,
+    CustomSourceResponse,
+    CustomSourceUpdate,
+)
+from app.services.custom_source_service import (
+    CustomSourceScrapeService,
+    slugify_source_name,
+)
 from app.services.fetch_engine import FetchEngine
 from app.services.translate_service import TranslateService
+from app.utils.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +59,14 @@ def _serialize_api_key(key) -> ApiKeyResponse:
         created_at=key.created_at,
         is_active=key.is_active,
     )
+
+
+def _serialize_custom_source(repo: CustomSourceRepository, source) -> CustomSourceResponse:
+    return CustomSourceResponse(**repo.to_dict(source))
+
+
+def _clear_sources_cache() -> None:
+    cache.delete("sources")
 
 
 # === Response Schemas ===
@@ -161,7 +185,8 @@ async def run_fetch_source(
     - **source_name**: 소스 이름 (googlenews, bitcoinmagazine, optech)
     - **hours**: 수집할 뉴스 시간 제한 (기본 24시간)
     """
-    available = FetchEngine.get_source_names()
+    repo = CustomSourceRepository(db)
+    available = sorted(set(FetchEngine.get_source_names() + repo.active_slugs()))
     if source_name not in available:
         raise HTTPException(
             status_code=404,
@@ -316,6 +341,243 @@ async def reset_dedup_groups(db: Session = Depends(get_db)):
                 "error": str(e),
             }
         )
+
+
+# === Custom Sources Management ===
+
+@router.post("/custom-sources/analyze", response_model=ApiResponse[CustomSourceAnalyzeResponse])
+async def analyze_custom_source(
+    body: CustomSourceAnalyzeRequest,
+):
+    """커스텀 스크래핑 소스 분석 (AI + 휴리스틱)"""
+    service = CustomSourceScrapeService()
+    try:
+        result = await service.analyze(name=body.name, list_url=body.list_url)
+        return ok(CustomSourceAnalyzeResponse(**result))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)}) from e
+    except httpx.HTTPError as e:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "소스 페이지를 불러오지 못했습니다.",
+                "error": str(e),
+                "type": type(e).__name__,
+            },
+        ) from e
+    except Exception as e:
+        logger.error(f"[Admin] Custom source analyze failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "커스텀 소스 분석 중 오류가 발생했습니다.",
+                "error": str(e),
+                "type": type(e).__name__,
+            },
+        ) from e
+
+
+@router.get("/custom-sources", response_model=ApiResponse[CustomSourceListResponse])
+async def list_custom_sources(db: Session = Depends(get_db)):
+    """커스텀 소스 목록 조회"""
+    repo = CustomSourceRepository(db)
+    sources = repo.get_all()
+    return ok(CustomSourceListResponse(
+        sources=[_serialize_custom_source(repo, source) for source in sources],
+    ))
+
+
+@router.post("/custom-sources", response_model=ApiResponse[CustomSourceResponse], status_code=201)
+async def create_custom_source(
+    body: CustomSourceCreate,
+    db: Session = Depends(get_db),
+):
+    """커스텀 소스 저장"""
+    repo = CustomSourceRepository(db)
+    service = CustomSourceScrapeService()
+
+    try:
+        slug = slugify_source_name(body.slug)
+        preview_items, validation_errors = await service.validate_saved_config(
+            name=body.name,
+            list_url=body.list_url,
+            extraction_rules=body.extraction_rules,
+            max_items=3,
+        )
+        if validation_errors or not preview_items:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "커스텀 소스 저장 전 검증에 실패했습니다.",
+                    "error": "; ".join(validation_errors or ["미리보기 결과 없음"]),
+                    "type": "ValidationError",
+                },
+            )
+
+        created = repo.create(
+            name=body.name.strip(),
+            slug=slug,
+            list_url=body.list_url.strip(),
+            extraction_rules=body.extraction_rules,
+            normalization_rules=body.normalization_rules,
+            is_active=body.is_active,
+            ai_model=body.ai_model,
+            last_validation_error=None,
+        )
+        _clear_sources_cache()
+        return ok(_serialize_custom_source(repo, created))
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)}) from e
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "동일한 이름 또는 slug의 커스텀 소스가 이미 존재합니다.",
+                "error": str(e),
+                "type": type(e).__name__,
+            },
+        ) from e
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Admin] Custom source create failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "커스텀 소스 저장 중 오류가 발생했습니다.",
+                "error": str(e),
+                "type": type(e).__name__,
+            },
+        ) from e
+
+
+@router.patch("/custom-sources/{source_id}", response_model=ApiResponse[CustomSourceResponse])
+async def update_custom_source(
+    source_id: int,
+    body: CustomSourceUpdate,
+    db: Session = Depends(get_db),
+):
+    """커스텀 소스 수정"""
+    repo = CustomSourceRepository(db)
+    source = repo.get_by_id(source_id)
+    if not source:
+        raise HTTPException(status_code=404, detail={"message": f"커스텀 소스를 찾을 수 없습니다: {source_id}"})
+
+    payload = body.model_dump(exclude_unset=True)
+    if not payload:
+        return ok(_serialize_custom_source(repo, source))
+
+    service = CustomSourceScrapeService()
+    try:
+        next_name = (payload.get("name") or source.name).strip()
+        next_slug = slugify_source_name((payload.get("slug") or source.slug).strip())
+        next_list_url = (payload.get("list_url") or source.list_url).strip()
+        next_rules = payload.get("extraction_rules")
+
+        touch_analyzed_at = False
+        last_validation_error = None
+        if next_rules is not None or "list_url" in payload or "name" in payload:
+            preview_items, validation_errors = await service.validate_saved_config(
+                name=next_name,
+                list_url=next_list_url,
+                extraction_rules=next_rules if next_rules is not None else repo.to_dict(source)["extraction_rules"],
+                max_items=3,
+            )
+            if validation_errors or not preview_items:
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "message": "커스텀 소스 검증에 실패했습니다.",
+                        "error": "; ".join(validation_errors or ["미리보기 결과 없음"]),
+                        "type": "ValidationError",
+                    },
+                )
+            touch_analyzed_at = True
+
+        updated = repo.update(
+            source,
+            name=next_name if "name" in payload else None,
+            slug=next_slug if "slug" in payload else None,
+            list_url=next_list_url if "list_url" in payload else None,
+            is_active=payload.get("is_active"),
+            extraction_rules=next_rules,
+            normalization_rules=payload.get("normalization_rules"),
+            ai_model=payload.get("ai_model"),
+            last_validation_error=last_validation_error,
+            touch_analyzed_at=touch_analyzed_at,
+        )
+        _clear_sources_cache()
+        return ok(_serialize_custom_source(repo, updated))
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)}) from e
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "동일한 이름 또는 slug의 커스텀 소스가 이미 존재합니다.",
+                "error": str(e),
+                "type": type(e).__name__,
+            },
+        ) from e
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Admin] Custom source update failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "커스텀 소스 수정 중 오류가 발생했습니다.",
+                "error": str(e),
+                "type": type(e).__name__,
+            },
+        ) from e
+
+
+@router.delete("/custom-sources/{source_id}", response_model=ApiResponse[dict])
+async def delete_custom_source(
+    source_id: int,
+    db: Session = Depends(get_db),
+):
+    """커스텀 소스 삭제"""
+    repo = CustomSourceRepository(db)
+    deleted = repo.delete(source_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail={"message": f"커스텀 소스를 찾을 수 없습니다: {source_id}"})
+    _clear_sources_cache()
+    return ok({"message": "커스텀 소스가 삭제되었습니다."})
+
+
+@router.post("/custom-sources/{source_id}/reanalyze", response_model=ApiResponse[CustomSourceAnalyzeResponse])
+async def reanalyze_custom_source(
+    source_id: int,
+    db: Session = Depends(get_db),
+):
+    """기존 커스텀 소스 재분석"""
+    repo = CustomSourceRepository(db)
+    source = repo.get_by_id(source_id)
+    if not source:
+        raise HTTPException(status_code=404, detail={"message": f"커스텀 소스를 찾을 수 없습니다: {source_id}"})
+
+    service = CustomSourceScrapeService()
+    try:
+        result = await service.analyze(name=source.name, list_url=source.list_url)
+        return ok(CustomSourceAnalyzeResponse(**result))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail={"message": str(e)}) from e
+    except Exception as e:
+        logger.error(f"[Admin] Custom source reanalyze failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "커스텀 소스 재분석 중 오류가 발생했습니다.",
+                "error": str(e),
+                "type": type(e).__name__,
+            },
+        ) from e
 
 
 # === API Key Management ===

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.source_status import SourceStatus
+from app.repositories.custom_source_repository import CustomSourceRepository
 from app.services.pipeline import (
     BitcoinFilterStage,
     DedupStage,
@@ -27,6 +28,7 @@ from app.services.sources.coindesk import CoinDeskFetcher
 from app.services.sources.coindeskkorea import CoinDeskKoreaFetcher
 from app.services.sources.cointelegraph import CointelegraphFetcher
 from app.services.sources.cryptoslate import CryptoSlateFetcher
+from app.services.sources.custom_scrape_runtime import CustomScrapeRuntime
 from app.services.sources.decrypt import DecryptFetcher
 from app.services.sources.googlenews import GoogleNewsFetcher
 from app.services.sources.optech import OptechFetcher
@@ -59,6 +61,8 @@ class FetchEngine:
         BlockmediaFetcher,
         TokenpostFetcher,
     ]
+
+    CUSTOM_RUNTIME_CLASS = CustomScrapeRuntime
 
     def __init__(self, db: Session, hours_limit: int = 24, translate: bool = True):
         """
@@ -120,7 +124,8 @@ class FetchEngine:
             "finished_at": None,
         }
 
-        sources_total = len(self.FETCHERS)
+        custom_sources = self._get_active_custom_sources()
+        sources_total = len(self.FETCHERS) + len(custom_sources)
 
         if progress_callback:
             await progress_callback({"sources_total": sources_total})
@@ -138,7 +143,18 @@ class FetchEngine:
                 logger.error(f"[{FetcherClass.source_name}] Fetch failed: {e}")
                 return {"source": FetcherClass.source_name, "items": [], "error": str(e)}
 
+        async def fetch_custom_only(custom_config: dict):
+            source_name = custom_config["slug"]
+            try:
+                runtime = self.CUSTOM_RUNTIME_CLASS(custom_config, hours_limit=self.hours_limit)
+                items = await runtime.fetch()
+                return {"source": source_name, "items": items, "error": None}
+            except Exception as e:
+                logger.error(f"[{source_name}] Custom fetch failed: {e}")
+                return {"source": source_name, "items": [], "error": str(e)}
+
         fetch_tasks = [fetch_only(FetcherClass) for FetcherClass in self.FETCHERS]
+        fetch_tasks.extend(fetch_custom_only(config) for config in custom_sources)
         fetch_results = await asyncio.gather(*fetch_tasks)
 
         # 2단계: Pipeline 처리 (DB 작업) - 순차 처리
@@ -306,6 +322,27 @@ class FetchEngine:
             if FetcherClass.source_name == source_name:
                 return await self._run_source(FetcherClass)
 
+        custom_config = self._get_custom_source_by_slug(source_name)
+        if custom_config:
+            try:
+                runtime = self.CUSTOM_RUNTIME_CLASS(custom_config, hours_limit=self.hours_limit)
+                items = await runtime.fetch()
+                return await self._process_fetched_items(source_name, items, None)
+            except Exception as e:
+                error_msg = str(e)
+                logger.error(f"[{source_name}] Custom fetch failed: {error_msg}", exc_info=True)
+                self._update_source_status(source_name, success=False, error=error_msg)
+                return {
+                    "success": False,
+                    "error": error_msg,
+                    "fetched": 0,
+                    "saved": 0,
+                    "duplicates": 0,
+                    "filtered": 0,
+                    "translation_failed": 0,
+                    "translation_dropped": 0,
+                }
+
         return {
             "success": False,
             "error": f"Unknown source: {source_name}",
@@ -318,3 +355,14 @@ class FetchEngine:
     def get_source_names(cls) -> List[str]:
         """등록된 소스 이름 목록"""
         return [f.source_name for f in cls.FETCHERS]
+
+    def _get_active_custom_sources(self) -> List[dict]:
+        repo = CustomSourceRepository(self.db)
+        return [repo.to_dict(source) for source in repo.get_active()]
+
+    def _get_custom_source_by_slug(self, slug: str) -> Optional[dict]:
+        repo = CustomSourceRepository(self.db)
+        source = repo.get_by_slug(slug)
+        if not source or not source.is_active:
+            return None
+        return repo.to_dict(source)

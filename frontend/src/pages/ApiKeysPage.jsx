@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { Key, Plus, Trash2, Copy, Check, RefreshCw, AlertTriangle } from 'lucide-react'
 import ErrorAlert from '../components/common/ErrorAlert'
 import { adminApi } from '../api/feed'
@@ -100,6 +101,16 @@ export default function ApiKeysPage() {
 
       {/* Error */}
       <ErrorAlert message={error} />
+
+      <div className="mb-4 flex items-center justify-between gap-2 text-xs">
+        <span className="text-zinc-500">Settings / API Keys</span>
+        <Link
+          to="/settings/sources"
+          className="text-orange-400 hover:text-orange-300 transition-colors"
+        >
+          Custom Sources 관리
+        </Link>
+      </div>
 
       {/* Create Form */}
       <form onSubmit={handleCreate} className="mb-6">

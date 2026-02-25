@@ -8,6 +8,7 @@ from app.database import Base
 from app.models import (  # noqa: F401
     api_key,
     bookmark,
+    custom_source,
     feed_item,
     market_data_snapshot,
     source_status,
