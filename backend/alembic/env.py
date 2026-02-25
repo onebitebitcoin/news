@@ -1,11 +1,19 @@
+import os
+import sys
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-from app.config import settings
-from app.database import Base
-from app.models import (  # noqa: F401
+
+CURRENT_DIR = os.path.dirname(__file__)
+BACKEND_DIR = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+
+from app.config import settings  # noqa: E402
+from app.database import Base  # noqa: E402
+from app.models import (  # noqa: E402,F401
     api_key,
     bookmark,
     custom_source,
