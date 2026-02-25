@@ -264,8 +264,11 @@ class BaseFetcher(ABC):
             "%Y-%m-%dT%H:%M:%S.%fZ",
             "%Y-%m-%dT%H:%M:%SZ",
             "%Y-%m-%dT%H:%M:%S%z",
+            "%Y-%m-%dT%H:%M:%S",      # ISO 8601, timezone 없음 (e.g. 2026-02-24T09:57:43)
             "%Y-%m-%d %H:%M:%S",
             "%Y-%m-%d",
+            "%b %d, %Y",              # 영문 축약 월 (e.g. Feb 24, 2026)
+            "%B %d, %Y",              # 영문 전체 월 (e.g. February 24, 2026)
         ]
 
         for fmt in formats:

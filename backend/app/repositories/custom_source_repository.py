@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy.orm import Session
@@ -44,7 +44,7 @@ class CustomSourceRepository:
         ai_model: Optional[str] = None,
         last_validation_error: Optional[str] = None,
     ) -> CustomSource:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         source = CustomSource(
             name=name,
             slug=slug,
@@ -122,9 +122,9 @@ class CustomSourceRepository:
         if last_validation_error is not None:
             source.last_validation_error = last_validation_error
         if touch_analyzed_at:
-            source.last_analyzed_at = datetime.utcnow()
+            source.last_analyzed_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
-        source.updated_at = datetime.utcnow()
+        source.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         self.db.commit()
         self.db.refresh(source)
         logger.info(f"Custom source updated: {source.slug} (id={source.id})")

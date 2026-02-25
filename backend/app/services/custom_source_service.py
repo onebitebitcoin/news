@@ -8,7 +8,7 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 from urllib.parse import urljoin, urlparse
 
@@ -79,7 +79,7 @@ def _strip_html(text: Optional[str]) -> str:
 class CustomSourceScrapeService:
     """커스텀 스크래핑 소스 분석 및 실행"""
 
-    AI_MODEL = "gpt-5-mini"
+    AI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     USER_AGENT = "Mozilla/5.0 (compatible; BitcoinNewsBot/1.0)"
     MAX_HTML_CHARS = 80_000
     MAX_PREVIEW_ITEMS = 5
@@ -90,6 +90,9 @@ class CustomSourceScrapeService:
         safe_url = validate_public_http_url(list_url)
         html, final_url = await self._fetch_html(safe_url)
         validate_public_http_url(final_url)
+
+        if self._is_sitemap(final_url, html):
+            return await self._analyze_sitemap(source_name, final_url, html)
 
         warnings: list[str] = []
         ai_rules = await self._build_ai_rules(source_name, final_url, html)
@@ -141,6 +144,15 @@ class CustomSourceScrapeService:
         extraction_rules: dict[str, Any],
         max_items: int = 5,
     ) -> tuple[list[dict[str, Any]], list[str]]:
+        if (extraction_rules or {}).get("strategy") == "sitemap":
+            items = await self._fetch_items_from_sitemap(
+                source_slug="validate",
+                source_name=name,
+                list_url=list_url,
+                extraction_rules=extraction_rules,
+                hours_limit=24 * 7,  # 검증용으로 7일 범위
+            )
+            return items[:max_items], []
         safe_url = validate_public_http_url(list_url)
         html, final_url = await self._fetch_html(safe_url)
         validate_public_http_url(final_url)
@@ -162,6 +174,14 @@ class CustomSourceScrapeService:
         extraction_rules: dict[str, Any],
         hours_limit: int = 24,
     ) -> list[dict[str, Any]]:
+        if extraction_rules.get("strategy") == "sitemap":
+            return await self._fetch_items_from_sitemap(
+                source_slug=source_slug,
+                source_name=source_name,
+                list_url=list_url,
+                extraction_rules=extraction_rules,
+                hours_limit=hours_limit,
+            )
         preview_items, errors = await self.validate_saved_config(
             name=source_name,
             list_url=list_url,
@@ -171,7 +191,7 @@ class CustomSourceScrapeService:
         if errors:
             logger.warning(f"[{source_slug}] Custom source validation warnings: {errors}")
 
-        cutoff = datetime.utcnow() - timedelta(hours=hours_limit)
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours_limit)
         items: list[dict[str, Any]] = []
         for item in preview_items:
             published_at = item["published_at"]
@@ -202,16 +222,169 @@ class CustomSourceScrapeService:
             )
         return items
 
+    # ── Sitemap 지원 ────────────────────────────────────────────
+
+    @staticmethod
+    def _is_sitemap(url: str, content: str) -> bool:
+        """URL 또는 컨텐츠로 sitemap XML 여부 판단"""
+        lower_url = url.lower()
+        if "sitemap" in lower_url or lower_url.endswith(".xml"):
+            stripped = content.lstrip()
+            if stripped.startswith("<?xml") or "<urlset" in content or "<sitemapindex" in content:
+                return True
+        if "<loc>" in content and ("<urlset" in content or "<sitemapindex" in content):
+            return True
+        return False
+
+    @staticmethod
+    def _parse_sitemap_urls(xml_text: str) -> list[dict[str, Any]]:
+        """sitemap XML에서 URL과 날짜 추출 (<loc>, <lastmod>, URL 내 날짜 패턴)
+
+        date_from_url=True인 항목이 하나라도 있으면, 그 항목들만 반환합니다.
+        URL에 날짜가 없고 <lastmod>만 있는 경우(내비게이션 페이지 등)를 제거하기 위함입니다.
+        """
+        items: list[dict[str, Any]] = []
+        for block in re.finditer(r"<url>(.*?)</url>", xml_text, re.DOTALL):
+            loc_m = re.search(r"<loc>([^<]+)</loc>", block.group(1))
+            if not loc_m:
+                continue
+            loc = loc_m.group(1).strip()
+
+            published_at: Optional[datetime] = None
+            date_from_url = False
+
+            # URL 내 날짜 패턴 우선
+            date_m = re.search(r"/(\d{4}-\d{2}-\d{2})[/\-]", loc)
+            if date_m:
+                published_at = BaseFetcher.parse_datetime(date_m.group(1))
+                date_from_url = bool(published_at)
+
+            # URL에 날짜 없으면 <lastmod> fallback
+            if not published_at:
+                lastmod_m = re.search(r"<lastmod>([^<]+)</lastmod>", block.group(1))
+                if lastmod_m:
+                    published_at = BaseFetcher.parse_datetime(lastmod_m.group(1).strip())
+
+            items.append({"url": loc, "published_at": published_at, "date_from_url": date_from_url})
+
+        # URL에 날짜가 있는 항목이 존재하면 그것만 반환 (내비게이션 노이즈 제거)
+        url_dated = [i for i in items if i["date_from_url"]]
+        return url_dated if url_dated else items
+
+    async def _analyze_sitemap(self, name: str, list_url: str, xml_text: str) -> dict[str, Any]:
+        """sitemap XML 소스 분석 결과 반환"""
+        all_items = self._parse_sitemap_urls(xml_text)
+        preview_items = []
+        for item in all_items[: self.MAX_PREVIEW_ITEMS]:
+            pub = item["published_at"] or datetime.now(timezone.utc).replace(tzinfo=None)
+            slug_title = item["url"].rstrip("/").split("/")[-1].replace("-", " ").title()
+            preview_items.append(
+                {
+                    "title": slug_title[:300] or item["url"],
+                    "url": item["url"],
+                    "published_at": pub.isoformat() + "Z",
+                    "summary": None,
+                    "image_url": None,
+                }
+            )
+        return {
+            "draft": {
+                "slug_suggestion": slugify_source_name(name),
+                "name": name,
+                "list_url": list_url,
+                "fetch_mode": "scrape",
+                "extraction_rules": {"strategy": "sitemap", "max_items": self.MAX_FETCH_ITEMS},
+                "normalization_rules": {},
+                "ai_model": None,
+            },
+            "preview_items": preview_items,
+            "warnings": ["sitemap.xml 소스입니다. 기사 제목은 URL slug로 대체됩니다."],
+            "validation_errors": [],
+            "is_valid": len(preview_items) > 0,
+        }
+
+    async def _fetch_items_from_sitemap(
+        self,
+        *,
+        source_slug: str,
+        source_name: str,
+        list_url: str,
+        extraction_rules: dict[str, Any],
+        hours_limit: int,
+    ) -> list[dict[str, Any]]:
+        """sitemap.xml에서 시간 필터 후 기사 목록 반환"""
+        safe_url = validate_public_http_url(list_url)
+        xml_text, final_url = await self._fetch_html(safe_url)
+        validate_public_http_url(final_url)
+
+        all_items = self._parse_sitemap_urls(xml_text)
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours_limit)
+        max_items = int(extraction_rules.get("max_items", self.MAX_FETCH_ITEMS))
+
+        results: list[dict[str, Any]] = []
+        for item in all_items:
+            if len(results) >= max_items:
+                break
+            pub = item["published_at"]
+            if not pub:
+                continue
+            # URL에서 날짜만 추출된 경우(시간 정보 없음) → 날짜 단위 비교로 하루 전체 커버
+            if item.get("date_from_url") and pub.hour == 0 and pub.minute == 0:
+                if pub.date() < cutoff.date():
+                    continue
+            elif pub < cutoff:
+                continue
+            url = item["url"]
+            url_hash = BaseFetcher.create_url_hash(url)
+            slug_title = url.rstrip("/").split("/")[-1].replace("-", " ").title()
+            results.append(
+                {
+                    "id": BaseFetcher.generate_id(source_slug, url_hash),
+                    "source": source_slug,
+                    "source_ref": source_name,
+                    "title": slug_title[:300] or url,
+                    "summary": "",
+                    "url": url,
+                    "author": source_name,
+                    "published_at": pub,
+                    "tags": ["bitcoin", "custom-source"],
+                    "url_hash": url_hash,
+                    "raw": {
+                        "custom_source": True,
+                        "custom_source_name": source_name,
+                        "custom_source_slug": source_slug,
+                        "list_url": list_url,
+                    },
+                    "image_url": None,
+                    "category": "news",
+                }
+            )
+        return results
+
+    # ── HTML 스크래핑 ────────────────────────────────────────────
+
     async def _fetch_html(self, url: str) -> tuple[str, str]:
+        """HTML 페이지를 가져옵니다. 리다이렉트를 수동으로 처리하여 SSRF를 방어합니다."""
         async with httpx.AsyncClient(
             timeout=15.0,
-            follow_redirects=True,
+            follow_redirects=False,
             headers={"User-Agent": self.USER_AGENT},
         ) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            html = resp.text[: self.MAX_HTML_CHARS]
-            return html, str(resp.url)
+            current_url = url
+            for _ in range(10):
+                resp = await client.get(current_url)
+                if resp.is_redirect:
+                    location = resp.headers.get("location", "")
+                    if not location:
+                        break
+                    next_url = urljoin(current_url, location)
+                    validate_public_http_url(next_url)  # 리다이렉트 전 SSRF 검증
+                    current_url = next_url
+                    continue
+                resp.raise_for_status()
+                html = resp.text[: self.MAX_HTML_CHARS]
+                return html, str(resp.url)
+        raise ValueError("최대 리다이렉트 횟수를 초과했습니다.")
 
     async def _build_ai_rules(self, name: str, list_url: str, html: str) -> dict[str, Any]:
         api_key = os.getenv("OPENAI_API_KEY", "").strip()
@@ -318,14 +491,13 @@ class CustomSourceScrapeService:
             if not preview:
                 continue
             if not preview.get("published_at"):
-                continue
+                # 많은 사이트가 메타 태그에 날짜를 넣지 않으므로 현재 시간으로 대체
+                preview["published_at"] = datetime.now(timezone.utc).replace(tzinfo=None)
+                logger.debug(f"published_at 없는 기사에 현재 시간 적용: {preview.get('url')}")
             valid_previews.append(preview)
 
         if not valid_previews:
-            validation_errors.append("게시시간을 추출하지 못해 저장할 수 없습니다.")
-
-        if len(valid_previews) < min(1, len(preview_targets)):
-            validation_errors.append("유효한 기사 미리보기 수가 부족합니다.")
+            validation_errors.append("유효한 기사 미리보기를 가져오지 못했습니다.")
 
         return valid_previews, list(dict.fromkeys(validation_errors))
 
@@ -368,8 +540,8 @@ class CustomSourceScrapeService:
 
                 parsed_abs = urlparse(absolute)
                 parsed_list = urlparse(list_url)
-                if parsed_abs.netloc != parsed_list.netloc and rules.get("strategy") == "hybrid_link_discovery":
-                    # 외부 도메인은 기본적으로 제외
+                if parsed_abs.netloc != parsed_list.netloc:
+                    # 외부 도메인은 항상 제외 (AI rules 포함)
                     continue
 
                 seen.add(absolute)

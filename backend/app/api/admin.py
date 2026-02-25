@@ -554,9 +554,14 @@ async def delete_custom_source(
 @router.post("/custom-sources/{source_id}/reanalyze", response_model=ApiResponse[CustomSourceAnalyzeResponse])
 async def reanalyze_custom_source(
     source_id: int,
+    update_rules: bool = False,
     db: Session = Depends(get_db),
 ):
-    """기존 커스텀 소스 재분석"""
+    """기존 커스텀 소스 재분석
+
+    - **update_rules**: True면 재분석 결과로 extraction_rules를 DB에 자동 저장합니다.
+      False(기본값)면 결과를 반환만 하고 저장하지 않습니다.
+    """
     repo = CustomSourceRepository(db)
     source = repo.get_by_id(source_id)
     if not source:
@@ -565,6 +570,17 @@ async def reanalyze_custom_source(
     service = CustomSourceScrapeService()
     try:
         result = await service.analyze(name=source.name, list_url=source.list_url)
+
+        if update_rules and result.get("is_valid"):
+            repo.update(
+                source,
+                extraction_rules=result["draft"]["extraction_rules"],
+                ai_model=result["draft"].get("ai_model"),
+                touch_analyzed_at=True,
+            )
+            _clear_sources_cache()
+            logger.info(f"[Admin] Custom source {source_id} rules updated via reanalyze")
+
         return ok(CustomSourceAnalyzeResponse(**result))
     except ValueError as e:
         raise HTTPException(status_code=400, detail={"message": str(e)}) from e
