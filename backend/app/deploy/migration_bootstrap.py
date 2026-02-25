@@ -28,6 +28,15 @@ BASELINE_TABLES = {
     "bookmarks",
 }
 
+# source_statuses는 구버전 레거시 DB에서 빠져 있을 수 있으므로
+# stamp 가능 여부 판단에는 핵심 테이블만 사용한다.
+CORE_BASELINE_TABLES = {
+    "api_keys",
+    "feed_items",
+    "market_data_snapshots",
+    "bookmarks",
+}
+
 
 def infer_legacy_revision(
     table_names: set[str],
@@ -40,7 +49,7 @@ def infer_legacy_revision(
         - None: stamp 불필요 (신규 DB 또는 이미 alembic_version 존재)
         - revision string: stamp 필요
     Raises:
-        ValueError: baseline 일부만 존재하는 불완전 스키마 (자동 stamp 위험)
+        ValueError: 핵심 baseline 테이블 일부만 존재하는 불완전 스키마 (자동 stamp 위험)
     """
     if "alembic_version" in table_names:
         return None
@@ -49,8 +58,9 @@ def infer_legacy_revision(
     if not has_any_baseline:
         return None
 
-    if not BASELINE_TABLES.issubset(table_names):
-        missing_tables = sorted(BASELINE_TABLES - table_names)
+    # 핵심 테이블 기준으로 완전성 검사 (source_statuses는 구버전 DB에서 누락 가능)
+    if not CORE_BASELINE_TABLES.issubset(table_names):
+        missing_tables = sorted(CORE_BASELINE_TABLES - table_names)
         raise ValueError(
             "레거시 DB 스키마가 부분적으로만 존재합니다. 자동 stamp를 중단합니다. "
             f"누락 테이블: {', '.join(missing_tables)}"
