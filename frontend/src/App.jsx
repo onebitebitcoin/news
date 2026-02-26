@@ -6,6 +6,7 @@ import ApiKeysPage from './pages/ApiKeysPage'
 import SourcesSettingsPage from './pages/SourcesSettingsPage'
 import DashboardPage from './pages/DashboardPage'
 import AddArticlePage from './pages/AddArticlePage'
+import AudioPage from './pages/AudioPage'
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="articles/add" element={<AddArticlePage />} />
           <Route path="bookmarks" element={<BookmarksPage />} />
+          <Route path="audio" element={<AudioPage />} />
           <Route path="settings/api-keys" element={<ApiKeysPage />} />
           <Route path="settings/sources" element={<SourcesSettingsPage />} />
         </Route>

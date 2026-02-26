@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import { Newspaper, BarChart3, Bookmark, Settings } from 'lucide-react'
+import { Newspaper, BarChart3, Bookmark, Headphones, Settings } from 'lucide-react'
 
 const navItems = [
   { to: '/', icon: Newspaper, label: 'News' },
   { to: '/dashboard', icon: BarChart3, label: 'Data' },
+  { to: '/audio', icon: Headphones, label: 'Audio' },
   { to: '/bookmarks', icon: Bookmark, label: 'Saved' },
   { to: '/settings/sources', icon: Settings, label: 'Settings' },
 ]

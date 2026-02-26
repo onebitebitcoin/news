@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     RESEARCHBITCOIN_API_TOKEN: str = ""
     TRANSLATION_REQUIRED: bool = True
 
+    # 오디오 업로드
+    # Railway Volume 사용 시: AUDIO_UPLOAD_DIR=/data/audio (Railway 대시보드에서 설정)
+    # 로컬 개발: 기본값 사용
+    AUDIO_UPLOAD_DIR: str = ""
+    AUDIO_MAX_SIZE_MB: int = 100  # 최대 업로드 파일 크기 (MB)
+
     # CORS
     CORS_ORIGINS: list[str] = ["http://localhost:6200", "http://localhost:5173"]
 

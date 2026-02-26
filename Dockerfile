@@ -49,6 +49,13 @@ ENV PYTHONUNBUFFERED=1
 ENV ENVIRONMENT=production
 ENV PYTHONPATH=/app/backend
 
+# 오디오 업로드 기본 경로 (Railway Volume 사용 시 AUDIO_UPLOAD_DIR=/data/audio 로 덮어씀)
+ENV AUDIO_UPLOAD_DIR=/data/audio
+RUN mkdir -p /data/audio
+
+# Railway Volume 마운트 포인트 선언
+VOLUME ["/data"]
+
 # Expose port (Railway provides PORT env var)
 EXPOSE 8000
 
