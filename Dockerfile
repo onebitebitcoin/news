@@ -53,9 +53,6 @@ ENV PYTHONPATH=/app/backend
 ENV AUDIO_UPLOAD_DIR=/data/audio
 RUN mkdir -p /data/audio
 
-# Railway Volume 마운트 포인트 선언
-VOLUME ["/data"]
-
 # Expose port (Railway provides PORT env var)
 EXPOSE 8000
 
