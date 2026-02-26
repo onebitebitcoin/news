@@ -1,6 +1,7 @@
 import logging
 from typing import List, Optional
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.audio import Audio
@@ -12,8 +13,20 @@ class AudioRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_all(self) -> List[Audio]:
-        return self.db.query(Audio).order_by(Audio.uploaded_at.desc()).all()
+    def get_all(self, query: Optional[str] = None) -> List[Audio]:
+        db_query = self.db.query(Audio)
+
+        if query:
+            like_query = f"%{query}%"
+            db_query = db_query.filter(
+                or_(
+                    Audio.title.ilike(like_query),
+                    Audio.description.ilike(like_query),
+                    Audio.filename.ilike(like_query),
+                )
+            )
+
+        return db_query.order_by(Audio.uploaded_at.desc()).all()
 
     def get_by_id(self, audio_id: int) -> Optional[Audio]:
         return self.db.query(Audio).filter(Audio.id == audio_id).first()

@@ -1,9 +1,10 @@
 import logging
 import os
+from typing import Optional
 
 import aiofiles
 import aiofiles.os
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -21,11 +22,14 @@ CHUNK_SIZE = 256 * 1024  # 256KB — 동시 접속 시 메모리 압박 최소�
 
 
 @router.get("/audio", response_model=ApiResponse[AudioListResponse])
-async def get_audio_list(db: Session = Depends(get_db)):
+async def get_audio_list(
+    q: Optional[str] = Query(default=None, description="제목/설명/파일명 부분 검색"),
+    db: Session = Depends(get_db),
+):
     """오디오 목록 조회"""
-    logger.info("GET /audio")
+    logger.info(f"GET /audio - q={q!r}")
     service = AudioService(db)
-    items = service.get_all()
+    items = service.get_all(query=q)
     return ok(AudioListResponse(
         items=[AudioResponse.model_validate(a) for a in items],
         total=len(items),

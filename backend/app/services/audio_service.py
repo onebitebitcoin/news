@@ -28,8 +28,9 @@ class AudioService:
         self.repo = AudioRepository(db)
         os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-    def get_all(self) -> List[Audio]:
-        return self.repo.get_all()
+    def get_all(self, query: Optional[str] = None) -> List[Audio]:
+        normalized_query = query.strip() if query else None
+        return self.repo.get_all(query=normalized_query or None)
 
     def get_by_id(self, audio_id: int) -> Optional[Audio]:
         return self.repo.get_by_id(audio_id)
