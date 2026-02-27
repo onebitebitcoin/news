@@ -25,7 +25,7 @@ TESTING = os.getenv("TESTING", "").lower() == "true"
 scheduler = AsyncIOScheduler()
 
 # 수집 주기 (시간)
-FETCH_INTERVAL_HOURS = 3
+FETCH_INTERVAL_HOURS = 1
 
 # 서버 시작 후 초기 fetch 지연 시간 (초)
 # 서버가 먼저 응답 가능하도록 지연
