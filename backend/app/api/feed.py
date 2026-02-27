@@ -336,8 +336,10 @@ async def create_manual_batch(
 
             now = datetime.now(timezone.utc)
             published_at = article.published_at or now
+            item_id = str(uuid.uuid4())
             item = FeedItem(
-                id=str(uuid.uuid4()),
+                id=item_id,
+                group_id=item_id,
                 source="manual",
                 title=translated_title,
                 summary=translated_summary,
@@ -421,8 +423,10 @@ async def create_manual_article(
             summary=body.summary,
             translator=translator,
         )
+        item_id = str(uuid.uuid4())
         item = FeedItem(
-            id=str(uuid.uuid4()),
+            id=item_id,
+            group_id=item_id,
             source="manual",
             title=translated_title,
             summary=translated_summary,
