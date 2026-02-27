@@ -171,20 +171,13 @@ async def fetch_mvrv_z_score(client: httpx.AsyncClient) -> float:
     if not token:
         raise RuntimeError("RESEARCHBITCOIN_API_TOKEN is not configured")
 
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "X-API-Key": token,
-    }
     resp = await client.get(
-        "https://api.researchbitcoin.net/api/v1/metrics/timeseries",
+        "https://api.researchbitcoin.net/v2/market_value_to_realized_value/mvrv_z",
         params={
-            "metric_category": "onchain_valuation",
-            "metrics": "market_value_to_realized_value",
-            "data_fields": "mvrv_z_score",
-            "interval": "10m",
-            "limit": 1,
+            "resolution": "d1",
+            "output_format": "json",
         },
-        headers=headers,
+        headers={"X-API-Token": token},
     )
     resp.raise_for_status()
     payload = resp.json()
@@ -192,15 +185,7 @@ async def fetch_mvrv_z_score(client: httpx.AsyncClient) -> float:
     if not rows:
         raise ValueError("ResearchBitcoin response has no data rows")
 
-    values = rows[0].get("values") or []
-    if not values:
-        raise ValueError("ResearchBitcoin response has no values")
-
-    for item in values:
-        if item.get("data_field") == "mvrv_z_score":
-            return float(item["value"])
-
-    raise ValueError("mvrv_z_score not found in ResearchBitcoin response")
+    return float(rows[0]["mvrv_z"])
 
 
 def calculate_kimchi_premium(
