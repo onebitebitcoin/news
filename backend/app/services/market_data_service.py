@@ -1,7 +1,9 @@
 """시장 데이터 외부 API 호출 + 캐시 갱신 서비스"""
 
+from __future__ import annotations
+
 import logging
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable, Coroutine
 
 import httpx
@@ -326,3 +328,186 @@ def save_daily_snapshot(data: dict) -> None:
         logger.info(f"[MarketData] Daily snapshot saved for {today_kst}")
     finally:
         db.close()
+
+
+# ─── 과거 날짜 데이터 수집 함수들 ───────────────────────────────────────────────
+
+async def fetch_btc_krw_for_date(client: httpx.AsyncClient, target_date: date) -> float | None:
+    """업비트 특정 날짜 BTC/KRW 종가 조회"""
+    # to = 다음날 KST 자정 = 다음날 UTC 15:00
+    to_str = (target_date + timedelta(days=1)).strftime("%Y-%m-%dT15:00:00Z")
+    resp = await client.get(
+        "https://api.upbit.com/v1/candles/days",
+        params={"market": "KRW-BTC", "to": to_str, "count": 1},
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if not data:
+        return None
+    return float(data[0]["trade_price"])
+
+
+async def fetch_btc_usd_for_date(client: httpx.AsyncClient, target_date: date) -> float | None:
+    """Kraken 특정 날짜 BTC/USD 종가 조회 (일별 OHLC)"""
+    since = int(datetime(target_date.year, target_date.month, target_date.day,
+                         tzinfo=timezone.utc).timestamp())
+    resp = await client.get(
+        "https://api.kraken.com/0/public/OHLC",
+        params={"pair": "XBTUSD", "interval": 1440, "since": since},
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    ohlc = data.get("result", {}).get("XXBTZUSD", [])
+    if not ohlc:
+        return None
+    # [time, open, high, low, close, vwap, volume, count]
+    return float(ohlc[0][4])
+
+
+async def fetch_usd_krw_for_date(client: httpx.AsyncClient, target_date: date) -> float | None:
+    """Frankfurter 특정 날짜 USD/KRW 환율 조회"""
+    date_str = target_date.strftime("%Y-%m-%d")
+    resp = await client.get(
+        f"https://api.frankfurter.app/{date_str}",
+        params={"from": "USD", "to": "KRW"},
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return float(data["rates"]["KRW"])
+
+
+async def fetch_fear_greed_for_date(client: httpx.AsyncClient, target_date: date) -> dict | None:
+    """alternative.me 특정 날짜 Fear & Greed 지수 조회"""
+    resp = await client.get(
+        "https://api.alternative.me/fng/",
+        params={"limit": 14},
+    )
+    resp.raise_for_status()
+    items = resp.json().get("data", [])
+    # timestamp는 UTC 자정 unix timestamp
+    target_ts = int(datetime(target_date.year, target_date.month, target_date.day,
+                             tzinfo=timezone.utc).timestamp())
+    for item in items:
+        if int(item.get("timestamp", 0)) == target_ts:
+            return {
+                "value": int(item["value"]),
+                "classification": item["value_classification"],
+            }
+    return None
+
+
+async def fetch_mvrv_z_score_for_date(client: httpx.AsyncClient, target_date: date) -> float | None:
+    """ResearchBitcoin 특정 날짜 MVRV Z-Score 조회"""
+    token = settings.RESEARCHBITCOIN_API_TOKEN.strip()
+    if not token:
+        return None
+    from_str = target_date.strftime("%Y-%m-%d")
+    to_str = (target_date + timedelta(days=1)).strftime("%Y-%m-%d")
+    resp = await client.get(
+        "https://api.researchbitcoin.net/v2/market_value_to_realized_value/mvrv_z",
+        params={"resolution": "d1", "from_time": from_str, "to_time": to_str, "output_format": "json"},
+        headers={"X-API-Token": token},
+    )
+    resp.raise_for_status()
+    rows = resp.json().get("data") or []
+    if not rows:
+        return None
+    return float(rows[0]["mvrv_z"])
+
+
+async def backfill_missing_snapshots(days: int = 7) -> None:
+    """최근 N일간 누락된 스냅샷을 과거 API 데이터로 채움 (1시간 크롤링 후 호출)"""
+    today_kst = datetime.now(KST).date()
+    dates_to_check = [today_kst - timedelta(days=i) for i in range(days)]
+
+    db = SessionLocal()
+    try:
+        existing_dates = {
+            row.date
+            for row in db.query(MarketDataSnapshot.date)
+            .filter(MarketDataSnapshot.date.in_(dates_to_check))
+            .all()
+        }
+        missing = sorted(d for d in dates_to_check if d not in existing_dates)
+
+        if not missing:
+            logger.debug("[Backfill] 누락된 스냅샷 없음")
+            return
+
+        logger.info(f"[Backfill] 누락 날짜 {len(missing)}개 보충 시작: {missing}")
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            for target_date in missing:
+                await _backfill_one_day(db, client, target_date, today_kst)
+    finally:
+        db.close()
+
+
+async def _backfill_one_day(db, client: httpx.AsyncClient, target_date: date, today_kst: date) -> None:
+    """단일 날짜 스냅샷 수집 및 저장"""
+    try:
+        if target_date == today_kst:
+            # 오늘: 인메모리 캐시 사용
+            current = market_data_state.get_all()
+            btc_krw_data = current.get("bitcoin_price_krw")
+            btc_usd_data = current.get("bitcoin_price_usd")
+            fng_data = current.get("fear_greed_index")
+            halving_data = current.get("halving")
+            snapshot = MarketDataSnapshot(
+                date=target_date,
+                bitcoin_price_krw=btc_krw_data["price"] if btc_krw_data else None,
+                bitcoin_price_usd=btc_usd_data["price"] if btc_usd_data else None,
+                usd_krw_rate=current.get("usd_krw_rate"),
+                kimchi_premium=current.get("kimchi_premium"),
+                fee_rates=current.get("fee_rates"),
+                fear_greed_value=fng_data["value"] if fng_data else None,
+                fear_greed_classification=fng_data["classification"] if fng_data else None,
+                mvrv_z_score=current.get("mvrv_z_score"),
+                difficulty_adjustment=current.get("difficulty_adjustment"),
+                hashrate_data=current.get("hashrate"),
+                mempool_stats=current.get("mempool_stats"),
+                block_height=halving_data["current_block_height"] if halving_data else None,
+            )
+        else:
+            # 과거 날짜: 외부 API에서 수집
+            btc_krw, btc_usd, usd_krw, fng, mvrv = None, None, None, None, None
+
+            try:
+                btc_krw = await fetch_btc_krw_for_date(client, target_date)
+            except Exception as e:
+                logger.warning(f"[Backfill] {target_date} BTC KRW 실패: {e}")
+            try:
+                btc_usd = await fetch_btc_usd_for_date(client, target_date)
+            except Exception as e:
+                logger.warning(f"[Backfill] {target_date} BTC USD 실패: {e}")
+            try:
+                usd_krw = await fetch_usd_krw_for_date(client, target_date)
+            except Exception as e:
+                logger.warning(f"[Backfill] {target_date} USD/KRW 실패: {e}")
+            try:
+                fng = await fetch_fear_greed_for_date(client, target_date)
+            except Exception as e:
+                logger.warning(f"[Backfill] {target_date} Fear&Greed 실패: {e}")
+            try:
+                mvrv = await fetch_mvrv_z_score_for_date(client, target_date)
+            except Exception as e:
+                logger.warning(f"[Backfill] {target_date} MVRV 실패: {e}")
+
+            kimchi = calculate_kimchi_premium(btc_krw, btc_usd, usd_krw) if (btc_krw and btc_usd and usd_krw) else None
+            snapshot = MarketDataSnapshot(
+                date=target_date,
+                bitcoin_price_krw=btc_krw,
+                bitcoin_price_usd=btc_usd,
+                usd_krw_rate=usd_krw,
+                kimchi_premium=kimchi,
+                fear_greed_value=fng["value"] if fng else None,
+                fear_greed_classification=fng["classification"] if fng else None,
+                mvrv_z_score=mvrv,
+            )
+
+        db.add(snapshot)
+        db.commit()
+        logger.info(f"[Backfill] {target_date} 스냅샷 저장 완료")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Backfill] {target_date} 저장 실패: {e}")

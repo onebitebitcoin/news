@@ -12,7 +12,7 @@ from app.database import SessionLocal
 from app.models.feed_item import FeedItem
 from app.scheduler_state import scheduler_state
 from app.services.fetch_engine import FetchEngine
-from app.services.market_data_service import update_market_data
+from app.services.market_data_service import backfill_missing_snapshots, update_market_data
 from app.services.translate_service import TranslateService
 from app.utils.cache import cache
 
@@ -153,6 +153,9 @@ async def scheduled_fetch():
         # 수집 완료 후 번역 실패 항목 재번역
         await retranslate_failed_items()
 
+        # 최근 7일 마켓 데이터 누락분 보충
+        await backfill_missing_snapshots()
+
     except Exception as e:
         logger.error(f"[Scheduler] Fetch failed: {e}", exc_info=True)
         scheduler_state.mark_idle()
@@ -175,7 +178,7 @@ def start_scheduler():
         replace_existing=True,
     )
 
-    # 이후 3시간마다 실행
+    # 이후 1시간마다 실행
     scheduler.add_job(
         scheduled_fetch,
         trigger=IntervalTrigger(hours=FETCH_INTERVAL_HOURS),
