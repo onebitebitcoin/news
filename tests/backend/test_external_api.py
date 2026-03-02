@@ -1,13 +1,6 @@
 from datetime import datetime
 
 from app.models.feed_item import FeedItem
-from app.repositories.api_key_repository import ApiKeyRepository
-
-
-def _create_api_key(db) -> str:
-    repo = ApiKeyRepository(db)
-    _, raw_key = repo.create("external-test-key")
-    return raw_key
 
 
 def _create_feed_item(db, item_id: str, source: str, title: str) -> None:
@@ -26,13 +19,11 @@ def _create_feed_item(db, item_id: str, source: str, title: str) -> None:
 
 
 def test_external_articles_filter_mode_manual(client, db):
-    api_key = _create_api_key(db)
     _create_feed_item(db, "manual-1", "manual", "Manual Article")
     _create_feed_item(db, "auto-1", "coindesk", "Auto Article")
 
     response = client.get(
         "/api/v1/external/articles?mode=manual",
-        headers={"X-API-Key": api_key},
     )
 
     assert response.status_code == 200
@@ -45,13 +36,11 @@ def test_external_articles_filter_mode_manual(client, db):
 
 
 def test_external_articles_filter_mode_auto(client, db):
-    api_key = _create_api_key(db)
     _create_feed_item(db, "manual-1", "manual", "Manual Article")
     _create_feed_item(db, "auto-1", "coindesk", "Auto Article")
 
     response = client.get(
         "/api/v1/external/articles?mode=auto",
-        headers={"X-API-Key": api_key},
     )
 
     assert response.status_code == 200
@@ -64,11 +53,17 @@ def test_external_articles_filter_mode_auto(client, db):
 
 
 def test_external_articles_filter_mode_invalid(client, db):
-    api_key = _create_api_key(db)
-
-    response = client.get(
-        "/api/v1/external/articles?mode=invalid",
-        headers={"X-API-Key": api_key},
-    )
+    response = client.get("/api/v1/external/articles?mode=invalid")
 
     assert response.status_code == 422
+
+
+def test_external_articles_public_without_api_key(client, db):
+    _create_feed_item(db, "auto-1", "coindesk", "Auto Article")
+
+    response = client.get("/api/v1/external/articles")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert len(payload["data"]["articles"]) == 1

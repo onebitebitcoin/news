@@ -1,4 +1,4 @@
-"""External API - 외부 서버용 기사 조회 API (API Key 인증 필요)"""
+"""External API - 외부 서버용 기사 조회 API"""
 
 import logging
 from typing import Literal, Optional
@@ -6,7 +6,6 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import verify_api_key
 from app.api.response import ok
 from app.database import get_db
 from app.schemas.common import ApiResponse
@@ -21,7 +20,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/external",
     tags=["external"],
-    dependencies=[Depends(verify_api_key)],
 )
 
 
