@@ -40,6 +40,7 @@ async def get_audio_list(
 async def upload_audio(
     title: str = Form(...),
     description: str = Form(None),
+    thumbnail_url: str = Form(None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
@@ -51,6 +52,7 @@ async def upload_audio(
             title=title,
             upload_file=file,
             description=description,
+            thumbnail_url=thumbnail_url or None,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

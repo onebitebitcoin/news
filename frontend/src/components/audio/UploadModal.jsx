@@ -6,6 +6,7 @@ const ACCEPTED = '.mp3,.mp4,.m4a,.wav,.ogg,.flac,.aac,.webm'
 export default function UploadModal({ onUpload, onClose }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [thumbnailUrl, setThumbnailUrl] = useState('')
   const [file, setFile] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
@@ -36,7 +37,7 @@ export default function UploadModal({ onUpload, onClose }) {
     setUploading(true)
     setError(null)
     try {
-      await onUpload(title.trim(), file, description.trim() || undefined)
+      await onUpload(title.trim(), file, description.trim() || undefined, thumbnailUrl.trim() || undefined)
       onClose()
     } catch (err) {
       setError(err.message || '업로드에 실패했습니다')
@@ -114,6 +115,15 @@ export default function UploadModal({ onUpload, onClose }) {
             placeholder="설명 (선택)"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-orange-500 transition-colors"
+          />
+
+          {/* 썸네일 이미지 URL (선택) */}
+          <input
+            type="url"
+            placeholder="썸네일 이미지 URL (선택)"
+            value={thumbnailUrl}
+            onChange={(e) => setThumbnailUrl(e.target.value)}
             className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-orange-500 transition-colors"
           />
 

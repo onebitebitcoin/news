@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Play, Pause, Trash2, Clock } from 'lucide-react'
 
 function formatDuration(seconds) {
@@ -26,6 +27,9 @@ function formatDate(dateStr) {
 export default function AudioCard({ audio, isPlaying, onPlay, onDelete }) {
   const duration = formatDuration(audio.duration)
   const fileSize = formatFileSize(audio.file_size)
+  const [imgError, setImgError] = useState(false)
+
+  const hasThumbnail = audio.thumbnail_url && !imgError
 
   return (
     <div
@@ -36,32 +40,43 @@ export default function AudioCard({ audio, isPlaying, onPlay, onDelete }) {
       }`}
       onClick={() => onPlay(audio)}
     >
-      {/* Play/Pause 버튼 */}
+      {/* 썸네일 + Play/Pause */}
       <button
-        className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-          isPlaying
-            ? 'bg-orange-500 text-white'
-            : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-        }`}
-        onClick={(e) => {
-          e.stopPropagation()
-          onPlay(audio)
-        }}
+        className="flex-shrink-0 relative w-10 h-10 rounded-full overflow-hidden"
+        onClick={(e) => { e.stopPropagation(); onPlay(audio) }}
       >
-        {isPlaying ? (
-          <Pause className="w-4 h-4" />
+        {hasThumbnail ? (
+          <>
+            <img
+              src={audio.thumbnail_url}
+              alt={audio.title}
+              className="w-full h-full object-cover"
+              onError={() => setImgError(true)}
+            />
+            <div className={`absolute inset-0 flex items-center justify-center transition-colors ${
+              isPlaying ? 'bg-orange-500/80' : 'bg-black/40 hover:bg-black/60'
+            }`}>
+              {isPlaying
+                ? <Pause className="w-4 h-4 text-white" />
+                : <Play className="w-4 h-4 text-white ml-0.5" />}
+            </div>
+          </>
         ) : (
-          <Play className="w-4 h-4 ml-0.5" />
+          <div className={`w-full h-full rounded-full flex items-center justify-center transition-colors ${
+            isPlaying
+              ? 'bg-orange-500 text-white'
+              : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+          }`}>
+            {isPlaying
+              ? <Pause className="w-4 h-4" />
+              : <Play className="w-4 h-4 ml-0.5" />}
+          </div>
         )}
       </button>
 
       {/* 정보 */}
       <div className="flex-1 min-w-0">
-        <p
-          className={`font-medium truncate text-sm ${
-            isPlaying ? 'text-orange-400' : 'text-zinc-100'
-          }`}
-        >
+        <p className={`font-medium truncate text-sm ${isPlaying ? 'text-orange-400' : 'text-zinc-100'}`}>
           {audio.title}
         </p>
         {audio.description && (
@@ -92,10 +107,7 @@ export default function AudioCard({ audio, isPlaying, onPlay, onDelete }) {
       {/* 삭제 버튼 */}
       <button
         className="flex-shrink-0 p-2 rounded-lg hover:bg-zinc-800 text-zinc-600 hover:text-red-400 transition-colors"
-        onClick={(e) => {
-          e.stopPropagation()
-          onDelete(audio.id)
-        }}
+        onClick={(e) => { e.stopPropagation(); onDelete(audio.id) }}
       >
         <Trash2 className="w-4 h-4" />
       </button>

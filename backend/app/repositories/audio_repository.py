@@ -39,6 +39,7 @@ class AudioRepository:
         file_size: Optional[int] = None,
         mime_type: Optional[str] = None,
         description: Optional[str] = None,
+        thumbnail_url: Optional[str] = None,
     ) -> Audio:
         audio = Audio(
             title=title,
@@ -47,6 +48,7 @@ class AudioRepository:
             file_size=file_size,
             mime_type=mime_type,
             description=description,
+            thumbnail_url=thumbnail_url,
         )
         self.db.add(audio)
         self.db.commit()

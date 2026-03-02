@@ -13,6 +13,7 @@ class AudioResponse(BaseModel):
     duration: Optional[int] = None
     mime_type: Optional[str] = None
     description: Optional[str] = None
+    thumbnail_url: Optional[str] = None
     uploaded_at: datetime
 
     class Config:

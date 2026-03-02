@@ -18,6 +18,7 @@ class Audio(Base):
     duration = Column(Integer, nullable=True)    # seconds
     mime_type = Column(String, nullable=True)
     description = Column(Text, nullable=True)
+    thumbnail_url = Column(String, nullable=True)
     uploaded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     def __repr__(self):

@@ -69,6 +69,7 @@ class AudioService:
         title: str,
         upload_file: UploadFile,
         description: Optional[str] = None,
+        thumbnail_url: Optional[str] = None,
     ) -> Audio:
         """비동기 파일 저장 — 이벤트 루프 블로킹 없이 대용량/동시 업로드 처리"""
         ext = os.path.splitext(upload_file.filename or "")[1].lower()
@@ -102,6 +103,7 @@ class AudioService:
             file_size=size,
             mime_type=upload_file.content_type,
             description=description,
+            thumbnail_url=thumbnail_url,
         )
 
     def delete(self, audio_id: int) -> bool:

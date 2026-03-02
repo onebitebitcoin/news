@@ -23,11 +23,12 @@ export function useAudioList() {
     fetch()
   }, [fetch])
 
-  const upload = useCallback(async (title, file, description) => {
+  const upload = useCallback(async (title, file, description, thumbnailUrl) => {
     const fd = new FormData()
     fd.append('title', title)
     fd.append('file', file)
     if (description) fd.append('description', description)
+    if (thumbnailUrl) fd.append('thumbnail_url', thumbnailUrl)
     const created = await audioApi.upload(fd)
     setItems((prev) => [created, ...prev])
     return created
