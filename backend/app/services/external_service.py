@@ -64,6 +64,7 @@ class ExternalService:
             source=item.source,
             category=item.category,
             published_at=item.published_at,
+            image_url=item.image_url,
         )
 
     def _to_article_detail(self, item: FeedItem) -> ExternalArticleDetail:

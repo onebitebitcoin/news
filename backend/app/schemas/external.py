@@ -14,6 +14,7 @@ class ExternalArticle(BaseModel):
     source: str
     category: Optional[str] = None
     published_at: Optional[datetime] = None
+    image_url: Optional[str] = None
 
     class Config:
         from_attributes = True
