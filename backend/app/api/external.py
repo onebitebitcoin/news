@@ -1,7 +1,7 @@
 """External API - 외부 서버용 기사 조회 API (API Key 인증 필요)"""
 
 import logging
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -31,6 +31,7 @@ async def get_articles(
     page_size: int = 20,
     category: Optional[str] = None,
     source: Optional[str] = None,
+    mode: Optional[Literal["manual", "auto"]] = None,
     search: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
@@ -41,6 +42,9 @@ async def get_articles(
     - **page_size**: 페이지 크기 (기본 20, 최대 100)
     - **category**: 카테고리 필터
     - **source**: 소스 필터
+    - **mode**: 수집 방식 필터 (`manual` | `auto`)
+      - `manual`: 수동 등록 기사만
+      - `auto`: 수동 등록 제외(자동 수집 기사)
     - **search**: 검색어 (제목, 요약)
     """
     page_size = min(page_size, 100)
@@ -51,6 +55,7 @@ async def get_articles(
         page_size=page_size,
         category=category,
         source=source,
+        mode=mode,
         search=search,
     )
 

@@ -24,6 +24,7 @@ class ExternalService:
         page_size: int = 20,
         category: Optional[str] = None,
         source: Optional[str] = None,
+        mode: Optional[str] = None,
         search: Optional[str] = None,
     ) -> Tuple[List[ExternalArticle], int]:
         """기사 목록 조회"""
@@ -32,6 +33,7 @@ class ExternalService:
             page_size=page_size,
             category=category,
             source=source,
+            mode=mode,
             search=search,
         )
         articles = [self._to_article(item) for item in items]

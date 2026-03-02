@@ -21,6 +21,7 @@ class FeedRepository:
         query,
         category: Optional[str] = None,
         source: Optional[str] = None,
+        mode: Optional[str] = None,
         search: Optional[str] = None,
     ):
         """공통 필터 적용"""
@@ -28,6 +29,10 @@ class FeedRepository:
             query = query.filter(FeedItem.category == category)
         if source:
             query = query.filter(FeedItem.source == source)
+        if mode == "manual":
+            query = query.filter(FeedItem.source == "manual")
+        elif mode == "auto":
+            query = query.filter(FeedItem.source != "manual")
         if search:
             search_term = f"%{search}%"
             query = query.filter(
@@ -44,11 +49,12 @@ class FeedRepository:
         page_size: int = 20,
         category: Optional[str] = None,
         source: Optional[str] = None,
+        mode: Optional[str] = None,
         search: Optional[str] = None,
     ) -> Tuple[List[FeedItem], int]:
         """피드 목록 조회"""
         query = self._apply_filters(
-            self.db.query(FeedItem), category, source, search
+            self.db.query(FeedItem), category, source, mode, search
         )
 
         # 전체 개수
@@ -137,6 +143,7 @@ class FeedRepository:
         page_size: int = 20,
         category: Optional[str] = None,
         source: Optional[str] = None,
+        mode: Optional[str] = None,
         search: Optional[str] = None,
     ) -> Tuple[List[Dict], int, Optional[datetime]]:
         """
@@ -150,7 +157,7 @@ class FeedRepository:
         """
         # 1) 그룹별 집계: count, max(published_at), 대표 아이템 id (가장 최신)
         base = self._apply_filters(
-            self.db.query(FeedItem), category, source, search
+            self.db.query(FeedItem), category, source, mode, search
         )
 
         group_agg = (
