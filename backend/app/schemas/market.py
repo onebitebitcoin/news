@@ -76,6 +76,7 @@ class MarketDataResponse(BaseModel):
     bitcoin_price_usd: Optional[BitcoinPriceUSD] = None
     usd_krw_rate: Optional[float] = None
     kimchi_premium: Optional[float] = None
+    bitcoin_dominance: Optional[float] = None
     fee_rates: Optional[FeeRates] = None
     fear_greed_index: Optional[FearGreedIndex] = None
     mvrv_z_score: Optional[float] = None
@@ -94,6 +95,7 @@ class MarketDataDaily(BaseModel):
     bitcoin_price_usd: Optional[float] = None
     usd_krw_rate: Optional[float] = None
     kimchi_premium: Optional[float] = None
+    bitcoin_dominance: Optional[float] = None
     fee_rates: Optional[FeeRates] = None
     fear_greed_index: Optional[FearGreedIndex] = None
     mvrv_z_score: Optional[float] = None

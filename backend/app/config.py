@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "dev-secret-key-change-in-production"
     OPENAI_API_KEY: str = ""
     RESEARCHBITCOIN_API_TOKEN: str = ""
+    COIN_GECKO_API_KEY: str = ""
     TRANSLATION_REQUIRED: bool = True
 
     # 오디오 업로드

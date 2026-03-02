@@ -167,6 +167,24 @@ async def fetch_fear_greed_index(client: httpx.AsyncClient) -> dict:
     }
 
 
+async def fetch_bitcoin_dominance(client: httpx.AsyncClient) -> float:
+    """CoinGecko Global API에서 BTC 도미넌스 조회"""
+    api_key = settings.COIN_GECKO_API_KEY.strip()
+    if not api_key:
+        raise RuntimeError("COIN_GECKO_API_KEY is not configured")
+
+    resp = await client.get(
+        "https://api.coingecko.com/api/v3/global",
+        headers={"x-cg-demo-api-key": api_key},
+    )
+    resp.raise_for_status()
+    payload = resp.json().get("data") or {}
+    dominance = payload.get("market_cap_percentage", {}).get("btc")
+    if dominance is None:
+        raise ValueError("CoinGecko response missing market_cap_percentage.btc")
+    return round(float(dominance), 2)
+
+
 async def fetch_mvrv_z_score(client: httpx.AsyncClient) -> float:
     """ResearchBitcoin API에서 MVRV Z-Score 조회"""
     token = settings.RESEARCHBITCOIN_API_TOKEN.strip()
@@ -248,6 +266,13 @@ async def update_market_data() -> None:
             market_data_state.update("kimchi_premium", premium)
 
         await _safe_fetch(
+            fetch_bitcoin_dominance,
+            "bitcoin_dominance",
+            "bitcoin_dominance",
+            "BTC dominance",
+            client,
+        )
+        await _safe_fetch(
             fetch_mempool_fees, "fee_rates", "mempool", "Mempool fees", client
         )
         await _safe_fetch(
@@ -314,6 +339,7 @@ def save_daily_snapshot(data: dict) -> None:
             bitcoin_price_usd=btc_usd_data["price"] if btc_usd_data else None,
             usd_krw_rate=data.get("usd_krw_rate"),
             kimchi_premium=data.get("kimchi_premium"),
+            bitcoin_dominance=data.get("bitcoin_dominance"),
             fee_rates=data.get("fee_rates"),
             fear_greed_value=fng_data["value"] if fng_data else None,
             fear_greed_classification=fng_data["classification"] if fng_data else None,
@@ -459,6 +485,7 @@ async def _backfill_one_day(db, client: httpx.AsyncClient, target_date: date, to
                 bitcoin_price_usd=btc_usd_data["price"] if btc_usd_data else None,
                 usd_krw_rate=current.get("usd_krw_rate"),
                 kimchi_premium=current.get("kimchi_premium"),
+                bitcoin_dominance=current.get("bitcoin_dominance"),
                 fee_rates=current.get("fee_rates"),
                 fear_greed_value=fng_data["value"] if fng_data else None,
                 fear_greed_classification=fng_data["classification"] if fng_data else None,
@@ -500,6 +527,7 @@ async def _backfill_one_day(db, client: httpx.AsyncClient, target_date: date, to
                 bitcoin_price_usd=btc_usd,
                 usd_krw_rate=usd_krw,
                 kimchi_premium=kimchi,
+                bitcoin_dominance=None,
                 fear_greed_value=fng["value"] if fng else None,
                 fear_greed_classification=fng["classification"] if fng else None,
                 mvrv_z_score=mvrv,

@@ -24,6 +24,7 @@ class MarketDataState:
             "bitcoin_price_usd": None,
             "usd_krw_rate": None,
             "kimchi_premium": None,
+            "bitcoin_dominance": None,
             "fee_rates": None,
             "fear_greed_index": None,
             "mvrv_z_score": None,

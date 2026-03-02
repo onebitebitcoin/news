@@ -3,6 +3,7 @@ import { useMarketData } from '../hooks/useMarketData'
 import ErrorAlert from '../components/common/ErrorAlert'
 import PriceCard from '../components/dashboard/PriceCard'
 import KimchiPremiumCard from '../components/dashboard/KimchiPremiumCard'
+import BitcoinDominanceCard from '../components/dashboard/BitcoinDominanceCard'
 import FearGreedCard from '../components/dashboard/FearGreedCard'
 import FeeRatesCard from '../components/dashboard/FeeRatesCard'
 import NetworkStatsCard from '../components/dashboard/NetworkStatsCard'
@@ -57,6 +58,7 @@ export default function DashboardPage() {
             premium={data?.kimchi_premium}
             usdKrwRate={data?.usd_krw_rate}
           />
+          <BitcoinDominanceCard dominance={data?.bitcoin_dominance} />
           <FearGreedCard fearGreed={data?.fear_greed_index} />
           <FeeRatesCard feeRates={data?.fee_rates} />
           <NetworkStatsCard

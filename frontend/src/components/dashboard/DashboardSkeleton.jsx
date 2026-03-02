@@ -38,6 +38,7 @@ export default function DashboardSkeleton() {
       <SkeletonCard />
       <SkeletonCard />
       <SkeletonCard />
+      <SkeletonCard />
       <SkeletonCardWide />
     </div>
   )

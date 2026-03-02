@@ -17,6 +17,7 @@ class MarketDataSnapshot(Base):
     bitcoin_price_usd = Column(Float, nullable=True)
     usd_krw_rate = Column(Float, nullable=True)
     kimchi_premium = Column(Float, nullable=True)
+    bitcoin_dominance = Column(Float, nullable=True)
     fee_rates = Column(JSON, nullable=True)
     fear_greed_value = Column(Integer, nullable=True)
     fear_greed_classification = Column(String, nullable=True)

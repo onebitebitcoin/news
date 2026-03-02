@@ -26,6 +26,11 @@ export const formatRate = (value) => {
   return new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 }).format(value)
 }
 
+export const formatDominancePercent = (value) => {
+  if (value == null) return '-'
+  return `${Number(value).toFixed(2)}%`
+}
+
 export function formatHashrate(hashrate) {
   if (hashrate == null) return '-'
   const eh = hashrate / 1e18
