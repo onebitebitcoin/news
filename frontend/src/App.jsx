@@ -6,7 +6,9 @@ import ApiKeysPage from './pages/ApiKeysPage'
 import SourcesSettingsPage from './pages/SourcesSettingsPage'
 import DashboardPage from './pages/DashboardPage'
 import AddArticlePage from './pages/AddArticlePage'
+import EditArticlePage from './pages/EditArticlePage'
 import AudioPage from './pages/AudioPage'
+import EditAudioPage from './pages/EditAudioPage'
 
 function App() {
   return (
@@ -16,8 +18,10 @@ function App() {
           <Route index element={<HomePage />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="articles/add" element={<AddArticlePage />} />
+          <Route path="articles/:id/edit" element={<EditArticlePage />} />
           <Route path="bookmarks" element={<BookmarksPage />} />
           <Route path="audio" element={<AudioPage />} />
+          <Route path="audio/:id/edit" element={<EditAudioPage />} />
           <Route path="settings/api-keys" element={<ApiKeysPage />} />
           <Route path="settings/sources" element={<SourcesSettingsPage />} />
         </Route>

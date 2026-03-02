@@ -15,6 +15,11 @@ export const audioApi = {
     return data
   },
 
+  update: async (id, data) => {
+    const { data: res } = await client.patch(`/audio/${id}`, data)
+    return res
+  },
+
   delete: async (id) => {
     const { data } = await client.delete(`/audio/${id}`)
     return data

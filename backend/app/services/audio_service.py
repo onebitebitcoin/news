@@ -106,6 +106,10 @@ class AudioService:
             thumbnail_url=thumbnail_url,
         )
 
+    def update(self, audio_id: int, update_data: dict) -> Optional[Audio]:
+        """오디오 정보 수정"""
+        return self.repo.update(audio_id, update_data)
+
     def delete(self, audio_id: int) -> bool:
         audio = self.repo.get_by_id(audio_id)
         if not audio:

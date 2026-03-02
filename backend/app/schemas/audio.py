@@ -24,3 +24,10 @@ class AudioListResponse(BaseModel):
     """오디오 목록 응답 스키마"""
     items: List[AudioResponse]
     total: int
+
+
+class AudioUpdate(BaseModel):
+    """오디오 정보 수정 요청"""
+    title: Optional[str] = None
+    description: Optional[str] = None
+    thumbnail_url: Optional[str] = None

@@ -91,6 +91,17 @@ class FeedRepository:
         self.db.refresh(feed_item)
         return feed_item
 
+    def update(self, item_id: str, update_data: dict) -> Optional[FeedItem]:
+        """피드 아이템 수정"""
+        item = self.get_by_id(item_id)
+        if not item:
+            return None
+        for key, value in update_data.items():
+            setattr(item, key, value)
+        self.db.commit()
+        self.db.refresh(item)
+        return item
+
     def get_categories(self) -> List[str]:
         """사용 가능한 카테고리 목록"""
         result = (

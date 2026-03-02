@@ -34,10 +34,16 @@ export function useAudioList() {
     return created
   }, [])
 
+  const updateItem = useCallback(async (id, data) => {
+    const updated = await audioApi.update(id, data)
+    setItems((prev) => prev.map((a) => (a.id === id ? updated : a)))
+    return updated
+  }, [])
+
   const remove = useCallback(async (id) => {
     await audioApi.delete(id)
     setItems((prev) => prev.filter((a) => a.id !== id))
   }, [])
 
-  return { items, loading, error, refresh: fetch, upload, remove }
+  return { items, loading, error, refresh: fetch, upload, updateItem, remove }
 }

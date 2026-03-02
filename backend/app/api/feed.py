@@ -21,6 +21,7 @@ from app.schemas.feed import (
     FeedItemResponse,
     FeedListResponse,
     ManualArticleCreate,
+    ManualArticleUpdate,
     SearchArticlesRequest,
     SearchArticlesResponse,
     UrlPreviewRequest,
@@ -453,6 +454,37 @@ async def create_manual_article(
             status_code=500,
             detail={
                 "message": "기사 추가 중 오류가 발생했습니다",
+                "error": str(e),
+                "type": type(e).__name__,
+            },
+        )
+
+
+@router.patch("/feed/{item_id}", response_model=ApiResponse[FeedItemResponse])
+async def update_feed_item(
+    item_id: str,
+    body: ManualArticleUpdate,
+    db: Session = Depends(get_db),
+):
+    """수동 기사 수정"""
+    logger.info(f"PATCH /feed/{item_id}")
+    try:
+        service = FeedService(db)
+        update_data = body.model_dump(exclude_unset=True)
+        updated = service.update_feed_item(item_id, update_data)
+        if not updated:
+            raise HTTPException(status_code=404, detail="Feed item not found")
+        return ok(updated)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"수동 기사 수정 실패 (id={item_id}): {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "기사 수정 중 오류가 발생했습니다",
                 "error": str(e),
                 "type": type(e).__name__,
             },

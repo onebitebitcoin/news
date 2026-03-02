@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Play, Pause, Trash2, Clock } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Play, Pause, Trash2, Clock, Pencil } from 'lucide-react'
 
 function formatDuration(seconds) {
   if (!seconds) return null
@@ -28,6 +29,7 @@ export default function AudioCard({ audio, isPlaying, onPlay, onDelete }) {
   const duration = formatDuration(audio.duration)
   const fileSize = formatFileSize(audio.file_size)
   const [imgError, setImgError] = useState(false)
+  const navigate = useNavigate()
 
   const hasThumbnail = audio.thumbnail_url && !imgError
 
@@ -104,13 +106,23 @@ export default function AudioCard({ audio, isPlaying, onPlay, onDelete }) {
         </div>
       </div>
 
-      {/* 삭제 버튼 */}
-      <button
-        className="flex-shrink-0 p-2 rounded-lg hover:bg-zinc-800 text-zinc-600 hover:text-red-400 transition-colors"
-        onClick={(e) => { e.stopPropagation(); onDelete(audio.id) }}
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
+      {/* 편집/삭제 버튼 */}
+      <div className="flex-shrink-0 flex items-center gap-1">
+        <button
+          className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-600 hover:text-zinc-300 transition-colors"
+          onClick={(e) => { e.stopPropagation(); navigate(`/audio/${audio.id}/edit`, { state: { audio } }) }}
+          title="편집"
+        >
+          <Pencil className="w-4 h-4" />
+        </button>
+        <button
+          className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-600 hover:text-red-400 transition-colors"
+          onClick={(e) => { e.stopPropagation(); onDelete(audio.id) }}
+          title="삭제"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   )
 }

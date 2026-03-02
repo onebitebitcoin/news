@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { Bookmark, Link as LinkIcon, Clock, Sparkles, Check } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Bookmark, Link as LinkIcon, Clock, Sparkles, Check, Pencil } from 'lucide-react'
 import { getTimeAgo } from '../../utils/dateUtils'
 
 export default function FeedCard({ item, onBookmark }) {
   const [copied, setCopied] = useState(false)
+  const navigate = useNavigate()
 
   const timeAgo = getTimeAgo(item.published_at)
 
@@ -108,6 +110,18 @@ export default function FeedCard({ item, onBookmark }) {
         >
           {copied ? <Check className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}
         </button>
+        {item.source === 'manual' && (
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              navigate(`/articles/${item.id}/edit`)
+            }}
+            className="p-2 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+            title="기사 편집"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </article>
   )

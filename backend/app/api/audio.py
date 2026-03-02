@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.response import ok
 from app.database import get_db
-from app.schemas.audio import AudioListResponse, AudioResponse
+from app.schemas.audio import AudioListResponse, AudioResponse, AudioUpdate
 from app.schemas.common import ApiResponse
 from app.services.audio_service import AudioService
 
@@ -118,6 +118,22 @@ async def stream_audio(audio_id: int, request: Request, db: Session = Depends(ge
         "Content-Type": content_type,
     }
     return StreamingResponse(iter_full(), status_code=200, headers=headers)
+
+
+@router.patch("/audio/{audio_id}", response_model=ApiResponse[AudioResponse])
+async def update_audio(
+    audio_id: int,
+    body: AudioUpdate,
+    db: Session = Depends(get_db),
+):
+    """오디오 정보 수정"""
+    logger.info(f"PATCH /audio/{audio_id}")
+    service = AudioService(db)
+    update_data = body.model_dump(exclude_unset=True)
+    updated = service.update(audio_id, update_data)
+    if not updated:
+        raise HTTPException(status_code=404, detail="오디오 파일을 찾을 수 없습니다")
+    return ok(AudioResponse.model_validate(updated))
 
 
 @router.delete("/audio/{audio_id}", response_model=ApiResponse[dict])

@@ -124,3 +124,11 @@ class BatchManualResponse(BaseModel):
     added: int
     skipped: int
     results: List[BatchManualResult]
+
+
+class ManualArticleUpdate(BaseModel):
+    """수동 기사 수정 요청"""
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    image_url: Optional[str] = None
+    category: Optional[str] = None

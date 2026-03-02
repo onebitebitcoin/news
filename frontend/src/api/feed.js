@@ -81,6 +81,12 @@ export const feedApi = {
     const { data } = await client.post('/feed/manual/batch', { articles })
     return data
   },
+
+  // 수동 기사 수정
+  updateArticle: async (id, data) => {
+    const { data: res } = await client.patch(`/feed/${id}`, data)
+    return res
+  },
 }
 
 export const adminApi = {

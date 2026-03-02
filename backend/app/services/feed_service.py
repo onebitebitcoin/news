@@ -132,6 +132,18 @@ class FeedService:
         cache.set("sources", result, ttl=300)
         return result
 
+    def update_feed_item(self, item_id: str, update_data: dict) -> Optional[FeedItemResponse]:
+        """수동 기사 수정 (manual 소스만 허용)"""
+        item = self.feed_repo.get_by_id(item_id)
+        if not item:
+            return None
+        if item.source != "manual":
+            raise PermissionError("수동 추가 기사만 편집할 수 있습니다")
+        updated = self.feed_repo.update(item_id, update_data)
+        if not updated:
+            return None
+        return FeedItemResponse.model_validate(updated)
+
     def _build_feed_response(
         self,
         item,

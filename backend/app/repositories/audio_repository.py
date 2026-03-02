@@ -55,6 +55,17 @@ class AudioRepository:
         self.db.refresh(audio)
         return audio
 
+    def update(self, audio_id: int, update_data: dict) -> Optional[Audio]:
+        """오디오 정보 수정"""
+        audio = self.get_by_id(audio_id)
+        if not audio:
+            return None
+        for key, value in update_data.items():
+            setattr(audio, key, value)
+        self.db.commit()
+        self.db.refresh(audio)
+        return audio
+
     def delete(self, audio_id: int) -> bool:
         audio = self.get_by_id(audio_id)
         if not audio:
