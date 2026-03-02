@@ -1,10 +1,12 @@
 import logging
+from datetime import datetime
 from typing import List, Optional
 
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.audio import Audio
+from app.models.audio_reference_link import AudioReferenceLink
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +16,7 @@ class AudioRepository:
         self.db = db
 
     def get_all(self, query: Optional[str] = None) -> List[Audio]:
-        db_query = self.db.query(Audio)
+        db_query = self.db.query(Audio).options(joinedload(Audio.reference_links))
 
         if query:
             like_query = f"%{query}%"
@@ -29,7 +31,12 @@ class AudioRepository:
         return db_query.order_by(Audio.uploaded_at.desc()).all()
 
     def get_by_id(self, audio_id: int) -> Optional[Audio]:
-        return self.db.query(Audio).filter(Audio.id == audio_id).first()
+        return (
+            self.db.query(Audio)
+            .options(joinedload(Audio.reference_links))
+            .filter(Audio.id == audio_id)
+            .first()
+        )
 
     def create(
         self,
@@ -71,5 +78,37 @@ class AudioRepository:
         if not audio:
             return False
         self.db.delete(audio)
+        self.db.commit()
+        return True
+
+    # --- 참고 링크 CRUD ---
+
+    def get_reference_links(self, audio_id: int) -> List[AudioReferenceLink]:
+        return (
+            self.db.query(AudioReferenceLink)
+            .filter(AudioReferenceLink.audio_id == audio_id)
+            .order_by(AudioReferenceLink.created_at)
+            .all()
+        )
+
+    def add_reference_link(
+        self, audio_id: int, url: str, title: Optional[str] = None
+    ) -> AudioReferenceLink:
+        link = AudioReferenceLink(
+            audio_id=audio_id,
+            url=url,
+            title=title,
+            created_at=datetime.utcnow(),
+        )
+        self.db.add(link)
+        self.db.commit()
+        self.db.refresh(link)
+        return link
+
+    def delete_reference_link(self, ref_id: int) -> bool:
+        link = self.db.query(AudioReferenceLink).filter(AudioReferenceLink.id == ref_id).first()
+        if not link:
+            return False
+        self.db.delete(link)
         self.db.commit()
         return True

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams, useLocation, Link } from 'react-router-dom'
-import { ArrowLeft, Save, Loader2 } from 'lucide-react'
+import { ArrowLeft, Save, Loader2, Plus, Trash2, Link as LinkIcon } from 'lucide-react'
 import { audioApi } from '../api/audio'
 import { extractApiError } from '../api/client'
 import { useAudioList } from '../hooks/useAudio'
@@ -23,6 +23,13 @@ export default function EditAudioPage() {
   const [description, setDescription] = useState('')
   const [thumbnailUrl, setThumbnailUrl] = useState('')
 
+  // 참고 링크 상태
+  const [references, setReferences] = useState([])
+  const [refUrl, setRefUrl] = useState('')
+  const [refTitle, setRefTitle] = useState('')
+  const [refLoading, setRefLoading] = useState(false)
+  const [refError, setRefError] = useState(null)
+
   // state로 안 넘어온 경우 목록에서 찾기
   useEffect(() => {
     if (!audio && !listLoading) {
@@ -30,7 +37,6 @@ export default function EditAudioPage() {
       if (found) {
         setAudio(found)
       } else if (items.length > 0) {
-        // 목록에 없으면 오디오 페이지로 이동
         navigate('/audio', { replace: true })
       }
     }
@@ -42,6 +48,7 @@ export default function EditAudioPage() {
       setTitle(audio.title || '')
       setDescription(audio.description || '')
       setThumbnailUrl(audio.thumbnail_url || '')
+      setReferences(audio.reference_links || [])
     }
   }, [audio])
 
@@ -65,6 +72,39 @@ export default function EditAudioPage() {
       setError(apiErr.message)
     } finally {
       setSubmitLoading(false)
+    }
+  }
+
+  const handleAddReference = async () => {
+    if (!refUrl.trim()) {
+      setRefError('URL을 입력해주세요')
+      return
+    }
+    setRefError(null)
+    setRefLoading(true)
+    try {
+      const res = await audioApi.addReference(parseInt(id), {
+        url: refUrl.trim(),
+        title: refTitle.trim() || null,
+      })
+      setReferences((prev) => [...prev, res.data])
+      setRefUrl('')
+      setRefTitle('')
+    } catch (err) {
+      const apiErr = extractApiError(err)
+      setRefError(apiErr.message)
+    } finally {
+      setRefLoading(false)
+    }
+  }
+
+  const handleDeleteReference = async (refId) => {
+    try {
+      await audioApi.deleteReference(parseInt(id), refId)
+      setReferences((prev) => prev.filter((r) => r.id !== refId))
+    } catch (err) {
+      const apiErr = extractApiError(err)
+      setRefError(apiErr.message)
     }
   }
 
@@ -103,15 +143,16 @@ export default function EditAudioPage() {
       )}
 
       {audio && (
-        <div className="space-y-4">
-          {/* 썸네일 미리보기 */}
-          {thumbnailUrl && (
-            <div className="rounded-lg overflow-hidden bg-zinc-900 w-32 h-32">
-              <img src={thumbnailUrl} alt="" className="w-full h-full object-cover" />
-            </div>
-          )}
-
+        <div className="space-y-6">
+          {/* 기본 정보 */}
           <div className="space-y-3">
+            {/* 썸네일 미리보기 */}
+            {thumbnailUrl && (
+              <div className="rounded-lg overflow-hidden bg-zinc-900 w-32 h-32">
+                <img src={thumbnailUrl} alt="" className="w-full h-full object-cover" />
+              </div>
+            )}
+
             <div>
               <label className="block text-sm text-zinc-400 mb-1">제목</label>
               <input
@@ -159,6 +200,85 @@ export default function EditAudioPage() {
             )}
             저장
           </button>
+
+          {/* 구분선 */}
+          <div className="border-t border-zinc-800" />
+
+          {/* 참고 링크 섹션 */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <LinkIcon className="w-4 h-4 text-zinc-400" />
+              <h2 className="text-sm font-semibold text-zinc-300">참고 링크</h2>
+              <span className="text-xs text-zinc-500">({references.length})</span>
+            </div>
+
+            {/* 링크 목록 */}
+            {references.length > 0 && (
+              <ul className="space-y-2">
+                {references.map((ref) => (
+                  <li
+                    key={ref.id}
+                    className="flex items-start gap-3 bg-zinc-900 rounded-lg px-3 py-2"
+                  >
+                    <div className="flex-1 min-w-0">
+                      {ref.title && (
+                        <p className="text-sm text-zinc-200 truncate">{ref.title}</p>
+                      )}
+                      <a
+                        href={ref.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-400 hover:text-blue-300 truncate block"
+                      >
+                        {ref.url}
+                      </a>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteReference(ref.id)}
+                      className="p-1 rounded hover:bg-zinc-700 text-zinc-500 hover:text-red-400 transition-colors flex-shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* 링크 추가 폼 */}
+            {refError && (
+              <p className="text-xs text-red-400">{refError}</p>
+            )}
+            <div className="space-y-2">
+              <input
+                type="url"
+                value={refUrl}
+                onChange={(e) => setRefUrl(e.target.value)}
+                placeholder="https://..."
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500 transition-colors"
+              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={refTitle}
+                  onChange={(e) => setRefTitle(e.target.value)}
+                  placeholder="링크 제목 (선택사항)"
+                  className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500 transition-colors"
+                />
+                <button
+                  onClick={handleAddReference}
+                  disabled={!refUrl.trim() || refLoading}
+                  className="px-3 py-2 bg-zinc-700 text-white rounded-lg hover:bg-zinc-600 transition-colors disabled:opacity-50 flex items-center gap-1 text-sm"
+                >
+                  {refLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                  추가
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

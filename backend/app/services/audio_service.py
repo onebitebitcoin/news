@@ -118,3 +118,26 @@ class AudioService:
             os.remove(audio.file_path)
             logger.info(f"Audio file deleted: {audio.file_path}")
         return self.repo.delete(audio_id)
+
+    # --- 참고 링크 ---
+
+    def get_reference_links(self, audio_id: int):
+        return self.repo.get_reference_links(audio_id)
+
+    def add_reference_link(self, audio_id: int, url: str, title: Optional[str] = None):
+        audio = self.repo.get_by_id(audio_id)
+        if not audio:
+            return None
+        return self.repo.add_reference_link(audio_id=audio_id, url=url, title=title)
+
+    def delete_reference_link(self, audio_id: int, ref_id: int) -> bool:
+        """audio_id 소유권 확인 후 참고 링크 삭제"""
+        from app.models.audio_reference_link import AudioReferenceLink
+        link = (
+            self.repo.db.query(AudioReferenceLink)
+            .filter(AudioReferenceLink.id == ref_id, AudioReferenceLink.audio_id == audio_id)
+            .first()
+        )
+        if not link:
+            return False
+        return self.repo.delete_reference_link(ref_id)

@@ -10,7 +10,13 @@ from sqlalchemy.orm import Session
 
 from app.api.response import ok
 from app.database import get_db
-from app.schemas.audio import AudioListResponse, AudioResponse, AudioUpdate
+from app.schemas.audio import (
+    AudioListResponse,
+    AudioReferenceLinkCreate,
+    AudioReferenceLinkResponse,
+    AudioResponse,
+    AudioUpdate,
+)
 from app.schemas.common import ApiResponse
 from app.services.audio_service import AudioService
 
@@ -144,4 +150,41 @@ async def delete_audio(audio_id: int, db: Session = Depends(get_db)):
     deleted = service.delete(audio_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="오디오 파일을 찾을 수 없습니다")
+    return ok({"message": "삭제되었습니다"})
+
+
+@router.get("/audio/{audio_id}/references", response_model=ApiResponse[list[AudioReferenceLinkResponse]])
+async def get_references(audio_id: int, db: Session = Depends(get_db)):
+    """오디오 참고 링크 목록 조회"""
+    logger.info(f"GET /audio/{audio_id}/references")
+    service = AudioService(db)
+    if not service.get_by_id(audio_id):
+        raise HTTPException(status_code=404, detail="오디오 파일을 찾을 수 없습니다")
+    links = service.get_reference_links(audio_id)
+    return ok([AudioReferenceLinkResponse.model_validate(link) for link in links])
+
+
+@router.post("/audio/{audio_id}/references", response_model=ApiResponse[AudioReferenceLinkResponse])
+async def add_reference(
+    audio_id: int,
+    body: AudioReferenceLinkCreate,
+    db: Session = Depends(get_db),
+):
+    """오디오 참고 링크 추가"""
+    logger.info(f"POST /audio/{audio_id}/references - url={body.url}")
+    service = AudioService(db)
+    link = service.add_reference_link(audio_id=audio_id, url=body.url, title=body.title)
+    if not link:
+        raise HTTPException(status_code=404, detail="오디오 파일을 찾을 수 없습니다")
+    return ok(AudioReferenceLinkResponse.model_validate(link))
+
+
+@router.delete("/audio/{audio_id}/references/{ref_id}", response_model=ApiResponse[dict])
+async def delete_reference(audio_id: int, ref_id: int, db: Session = Depends(get_db)):
+    """오디오 참고 링크 삭제"""
+    logger.info(f"DELETE /audio/{audio_id}/references/{ref_id}")
+    service = AudioService(db)
+    deleted = service.delete_reference_link(audio_id=audio_id, ref_id=ref_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="참고 링크를 찾을 수 없습니다")
     return ok({"message": "삭제되었습니다"})

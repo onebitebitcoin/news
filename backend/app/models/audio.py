@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import Column, DateTime, Integer, String, Text
+from sqlalchemy.orm import relationship
 
 from app.database import Base
 
@@ -20,6 +21,13 @@ class Audio(Base):
     description = Column(Text, nullable=True)
     thumbnail_url = Column(String, nullable=True)
     uploaded_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    reference_links = relationship(
+        "AudioReferenceLink",
+        back_populates="audio",
+        cascade="all, delete-orphan",
+        order_by="AudioReferenceLink.created_at",
+    )
 
     def __repr__(self):
         return f"<Audio(id={self.id}, title={self.title})>"
