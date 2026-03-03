@@ -7,6 +7,7 @@ import BitcoinDominanceCard from '../components/dashboard/BitcoinDominanceCard'
 import FearGreedCard from '../components/dashboard/FearGreedCard'
 import FeeRatesCard from '../components/dashboard/FeeRatesCard'
 import NetworkStatsCard from '../components/dashboard/NetworkStatsCard'
+import LongShortRatioCard from '../components/dashboard/LongShortRatioCard'
 import DashboardSkeleton from '../components/dashboard/DashboardSkeleton'
 
 function formatUpdatedAt(isoString) {
@@ -67,6 +68,7 @@ export default function DashboardPage() {
             mempool={data?.mempool_stats}
             halving={data?.halving}
           />
+          <LongShortRatioCard longShortRatio={data?.long_short_ratio} />
         </div>
       )}
     </div>

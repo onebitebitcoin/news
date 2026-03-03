@@ -70,6 +70,13 @@ class HalvingInfo(BaseModel):
     current_era: int
 
 
+class LongShortRatio(BaseModel):
+    """Binance 선물 글로벌 롱/숏 계좌 비율"""
+    long_account: float
+    short_account: float
+    long_short_ratio: float
+
+
 class MarketDataResponse(BaseModel):
     """시장 데이터 전체 응답 (모든 필드 Optional - 부분 실패 허용)"""
     bitcoin_price_krw: Optional[BitcoinPriceKRW] = None
@@ -84,6 +91,7 @@ class MarketDataResponse(BaseModel):
     hashrate: Optional[HashRate] = None
     mempool_stats: Optional[MempoolStats] = None
     halving: Optional[HalvingInfo] = None
+    long_short_ratio: Optional[LongShortRatio] = None
     updated_at: Optional[str] = None
     errors: Optional[dict[str, Any]] = None
 

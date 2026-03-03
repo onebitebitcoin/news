@@ -32,6 +32,7 @@ class MarketDataState:
             "hashrate": None,
             "mempool_stats": None,
             "halving": None,
+            "long_short_ratio": None,
             "updated_at": None,
             "errors": {},
         }

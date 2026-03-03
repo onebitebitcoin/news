@@ -185,6 +185,21 @@ async def fetch_bitcoin_dominance(client: httpx.AsyncClient) -> float:
     return round(float(dominance), 2)
 
 
+async def fetch_long_short_ratio(client: httpx.AsyncClient) -> dict:
+    """Binance 선물 글로벌 롱/숏 계좌 비율 조회 (무료 API, 인증 불필요)"""
+    resp = await client.get(
+        "https://fapi.binance.com/futures/data/globalLongShortAccountRatio",
+        params={"symbol": "BTCUSDT", "period": "1h", "limit": 1},
+    )
+    resp.raise_for_status()
+    data = resp.json()[0]
+    return {
+        "long_account": round(float(data["longAccount"]) * 100, 2),
+        "short_account": round(float(data["shortAccount"]) * 100, 2),
+        "long_short_ratio": round(float(data["longShortRatio"]), 4),
+    }
+
+
 async def fetch_mvrv_z_score(client: httpx.AsyncClient) -> float:
     """ResearchBitcoin API에서 MVRV Z-Score 조회"""
     token = settings.RESEARCHBITCOIN_API_TOKEN.strip()
@@ -294,6 +309,9 @@ async def update_market_data() -> None:
         )
         await _safe_fetch(
             fetch_mempool_stats, "mempool_stats", "mempool_stats", "Mempool stats", client
+        )
+        await _safe_fetch(
+            fetch_long_short_ratio, "long_short_ratio", "long_short_ratio", "Long/Short ratio", client
         )
 
         # 블록 높이 + 반감기 계산
