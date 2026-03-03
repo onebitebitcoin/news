@@ -80,6 +80,7 @@ async def get_market_history(
                 hashrate=snap.hashrate_data,
                 mempool_stats=snap.mempool_stats,
                 halving=None,
+                long_short_ratio=snap.long_short_ratio,
             )
         )
 
@@ -103,6 +104,7 @@ async def get_market_history(
         hashrate=current.get("hashrate"),
         mempool_stats=current.get("mempool_stats"),
         halving=current.get("halving"),
+        long_short_ratio=current.get("long_short_ratio"),
     )
     result.append(today_entry)
 

@@ -111,6 +111,7 @@ class MarketDataDaily(BaseModel):
     hashrate: Optional[HashRate] = None
     mempool_stats: Optional[MempoolStats] = None
     halving: Optional[HalvingInfo] = None
+    long_short_ratio: Optional[LongShortRatio] = None
 
 
 class MarketHistoryResponse(BaseModel):

@@ -26,6 +26,7 @@ class MarketDataSnapshot(Base):
     hashrate_data = Column(JSON, nullable=True)
     mempool_stats = Column(JSON, nullable=True)
     block_height = Column(Integer, nullable=True)
+    long_short_ratio = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     def __repr__(self):

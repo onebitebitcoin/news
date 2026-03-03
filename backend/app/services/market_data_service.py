@@ -366,6 +366,7 @@ def save_daily_snapshot(data: dict) -> None:
             hashrate_data=data.get("hashrate"),
             mempool_stats=data.get("mempool_stats"),
             block_height=halving_data["current_block_height"] if halving_data else None,
+            long_short_ratio=data.get("long_short_ratio"),
         )
         db.add(snapshot)
         db.commit()
