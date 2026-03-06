@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, Pause, Trash2, Clock, Pencil } from 'lucide-react'
+import { Play, Pause, Trash2, Clock, Pencil, Download } from 'lucide-react'
+import { audioApi } from '../../api/audio'
 
 function formatDuration(seconds) {
   if (!seconds) return null
@@ -108,6 +109,15 @@ export default function AudioCard({ audio, isPlaying, onPlay, onDelete }) {
 
       {/* 편집/삭제 버튼 */}
       <div className="flex-shrink-0 flex items-center gap-1">
+        <a
+          href={audioApi.getDownloadUrl(audio.id)}
+          download={audio.filename}
+          className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-600 hover:text-zinc-300 transition-colors"
+          onClick={(e) => e.stopPropagation()}
+          title="다운로드"
+        >
+          <Download className="w-4 h-4" />
+        </a>
         <button
           className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-600 hover:text-zinc-300 transition-colors"
           onClick={(e) => { e.stopPropagation(); navigate(`/audio/${audio.id}/edit`, { state: { audio } }) }}

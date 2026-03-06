@@ -26,6 +26,7 @@ export const audioApi = {
   },
 
   getStreamUrl: (id) => `${BASE_URL}/audio/${id}/stream`,
+  getDownloadUrl: (id) => `${BASE_URL}/audio/${id}/stream?download=1`,
 
   getReferences: async (audioId) => {
     const { data } = await client.get(`/audio/${audioId}/references`)

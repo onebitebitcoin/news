@@ -1,6 +1,7 @@
 import logging
 import os
 from typing import Optional
+from urllib.parse import quote
 
 import aiofiles
 import aiofiles.os
@@ -66,7 +67,12 @@ async def upload_audio(
 
 
 @router.get("/audio/{audio_id}/stream")
-async def stream_audio(audio_id: int, request: Request, db: Session = Depends(get_db)):
+async def stream_audio(
+    audio_id: int,
+    request: Request,
+    download: bool = Query(default=False, description="파일 다운로드 모드"),
+    db: Session = Depends(get_db),
+):
     """오디오 스트리밍 — aiofiles 비동기 I/O + HTTP Range Request 지원
 
     동시 N명 스트리밍 시 이벤트 루프를 블로킹하지 않아 Uvicorn 스레드 풀 고갈 없음.
@@ -82,6 +88,10 @@ async def stream_audio(audio_id: int, request: Request, db: Session = Depends(ge
     file_size = os.path.getsize(audio.file_path)
     content_type = audio.mime_type or "audio/mpeg"
     range_header = request.headers.get("Range")
+    content_disposition = None
+    if download:
+        download_name = audio.filename or f"audio-{audio_id}"
+        content_disposition = f"attachment; filename*=UTF-8''{quote(download_name)}"
 
     if range_header:
         range_val = range_header.replace("bytes=", "")
@@ -108,6 +118,8 @@ async def stream_audio(audio_id: int, request: Request, db: Session = Depends(ge
             "Content-Length": str(content_length),
             "Content-Type": content_type,
         }
+        if content_disposition:
+            headers["Content-Disposition"] = content_disposition
         return StreamingResponse(iter_range(), status_code=206, headers=headers)
 
     async def iter_full():
@@ -123,6 +135,8 @@ async def stream_audio(audio_id: int, request: Request, db: Session = Depends(ge
         "Content-Length": str(file_size),
         "Content-Type": content_type,
     }
+    if content_disposition:
+        headers["Content-Disposition"] = content_disposition
     return StreamingResponse(iter_full(), status_code=200, headers=headers)
 
 
